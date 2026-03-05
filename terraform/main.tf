@@ -1,0 +1,146 @@
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+}
+
+#------------------------------------------------------------------------------
+# ECR Repository
+#------------------------------------------------------------------------------
+
+resource "aws_ecr_repository" "agent" {
+  name                 = "${var.project_name}-agent"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = false
+  }
+}
+
+#------------------------------------------------------------------------------
+# IAM Role for AgentCore Runtime
+#------------------------------------------------------------------------------
+
+resource "aws_iam_role" "agentcore_runtime" {
+  name = "${var.project_name}-agentcore-runtime"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "bedrock-agentcore.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = local.account_id
+          }
+          ArnLike = {
+            "aws:SourceArn" = "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:*"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "agentcore_runtime" {
+  name = "${var.project_name}-agentcore-runtime"
+  role = aws_iam_role.agentcore_runtime.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "BedrockModelInvocation"
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ]
+        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
+      },
+      {
+        Sid    = "ECRAccess"
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CloudWatchLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${local.account_id}:*"
+      },
+      {
+        Sid    = "AgentCoreMemory"
+        Effect = "Allow"
+        Action = [
+          "bedrock-agentcore:CreateSession",
+          "bedrock-agentcore:GetSession",
+          "bedrock-agentcore:ListSessions",
+          "bedrock-agentcore:DeleteSession",
+          "bedrock-agentcore:CreateEvent",
+          "bedrock-agentcore:ListEvents",
+          "bedrock-agentcore:RetrieveMemoryRecords",
+          "bedrock-agentcore:IngestMemoryRecords",
+          "bedrock-agentcore:ListMemoryRecords"
+        ]
+        Resource = "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:memory/*"
+      }
+    ]
+  })
+}
+
+#------------------------------------------------------------------------------
+# AgentCore Runtime
+#------------------------------------------------------------------------------
+
+resource "aws_bedrockagentcore_agent_runtime" "main" {
+  agent_runtime_name = replace(var.project_name, "-", "_")
+  role_arn           = aws_iam_role.agentcore_runtime.arn
+
+  agent_runtime_artifact {
+    container_configuration {
+      container_uri = "${aws_ecr_repository.agent.repository_url}@sha256:2770219b624242ddead7a91e60acc6e03a86d06390b30b22578a0b3d940ea8eb"
+    }
+  }
+
+  network_configuration {
+    network_mode = "PUBLIC"
+  }
+
+  environment_variables = {
+    AWS_REGION       = var.aws_region
+    BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
+    MEMORY_ID        = aws_bedrockagentcore_memory.main.id
+  }
+
+  depends_on = [aws_bedrockagentcore_memory_strategy.semantic]
+}
+
+#------------------------------------------------------------------------------
+# AgentCore Memory
+#------------------------------------------------------------------------------
+
+resource "aws_bedrockagentcore_memory" "main" {
+  name                  = replace(var.project_name, "-", "_")
+  description           = "Memory for ${var.project_name} agent"
+  event_expiry_duration = 30
+}
+
+resource "aws_bedrockagentcore_memory_strategy" "semantic" {
+  name       = "semantic_memory"
+  memory_id  = aws_bedrockagentcore_memory.main.id
+  type       = "SEMANTIC"
+  namespaces = ["/strategies/{memoryStrategyId}/actors/{actorId}/"]
+}
