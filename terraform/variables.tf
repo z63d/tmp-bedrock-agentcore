@@ -14,3 +14,25 @@ variable "project_name" {
   type        = string
   default     = "k-bedrock-agentcore"
 }
+
+#------------------------------------------------------------------------------
+# CloudWatch MCP Server Variables
+#------------------------------------------------------------------------------
+
+variable "enable_cloudwatch_mcp" {
+  description = "Enable CloudWatch MCP Server integration"
+  type        = bool
+  default     = true
+}
+
+variable "cloudwatch_mcp_lambda_memory" {
+  description = "Memory size for CloudWatch MCP Lambda in MB"
+  type        = number
+  default     = 512
+}
+
+variable "cloudwatch_mcp_lambda_timeout" {
+  description = "Timeout for CloudWatch MCP Lambda in seconds"
+  type        = number
+  default     = 30
+}

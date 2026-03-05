@@ -297,14 +297,40 @@ npm run build
 # Dockerイメージビルド (arm64)
 docker build --platform linux/arm64 -t bedrock-agent:latest .
 
+# ECR URLを取得して環境変数に設定（exportで後続のコマンドでも使用可能にする）
+export ECR_URL=$(cd ../terraform && terraform output -raw ecr_repository_url)
+echo "ECR_URL: $ECR_URL"
+
 # ECRログイン
-ECR_URL=$(cd ../terraform && terraform output -raw ecr_repository_url)
 aws ecr get-login-password --region ap-northeast-1 --profile pn-playground-admin | \
   docker login --username AWS --password-stdin ${ECR_URL%/*}
 
 # タグ付けとプッシュ
 docker tag bedrock-agent:latest $ECR_URL:latest
 docker push $ECR_URL:latest
+```
+
+#### 2.3.3 CloudWatch MCP Lambda のビルドとプッシュ（オプション）
+
+CloudWatch MCP機能を有効にする場合（`enable_cloudwatch_mcp = true`）、Lambda用のDockerイメージもビルド＆プッシュが必要です。
+
+```bash
+cd lambda/cloudwatch-mcp
+
+# CloudWatch MCP用のECR URLを取得
+export CW_MCP_ECR_URL=$(cd ../../terraform && terraform output -raw cloudwatch_mcp_ecr_repository_url)
+echo "CW_MCP_ECR_URL: $CW_MCP_ECR_URL"
+
+# ECRログイン（まだの場合）
+aws ecr get-login-password --region ap-northeast-1 --profile pn-playground-admin | \
+  docker login --username AWS --password-stdin ${CW_MCP_ECR_URL%/*}
+
+# Dockerイメージビルド (arm64)
+docker build --platform linux/arm64 -t cloudwatch-mcp:latest .
+
+# タグ付けとプッシュ
+docker tag cloudwatch-mcp:latest $CW_MCP_ECR_URL:latest
+docker push $CW_MCP_ECR_URL:latest
 ```
 
 ### 2.4 Step 3: Terraformの再実行
@@ -331,19 +357,23 @@ npm run build
 docker build --platform linux/arm64 -t bedrock-agent:latest .
 docker push $ECR_URL:latest
 
-# 2. AgentCore Runtimeを更新（AWS CLIを使用）
+# 2. Terraform outputから必要な値を取得
+export RUNTIME_ID=$(cd ../terraform && terraform output -raw agent_runtime_id)
+export ROLE_ARN=$(cd ../terraform && terraform output -raw agentcore_role_arn)
+
+# 3. AgentCore Runtimeを更新（AWS CLIを使用）
 aws bedrock-agentcore-control update-agent-runtime \
-  --agent-runtime-id "<runtime-id>" \
-  --agent-runtime-artifact '{"containerConfiguration": {"containerUri": "<ecr-url>:latest"}}' \
-  --role-arn "<role-arn>" \
+  --agent-runtime-id "$RUNTIME_ID" \
+  --agent-runtime-artifact "{\"containerConfiguration\": {\"containerUri\": \"$ECR_URL:latest\"}}" \
+  --role-arn "$ROLE_ARN" \
   --network-configuration '{"networkMode": "PUBLIC"}' \
   --environment-variables '{"AWS_REGION": "ap-northeast-1", "BEDROCK_MODEL_ID": "amazon.nova-lite-v1:0"}' \
   --profile pn-playground-admin \
   --region ap-northeast-1
 
-# 3. ステータスがREADYになるまで待機
+# 4. ステータスがREADYになるまで待機
 aws bedrock-agentcore-control get-agent-runtime \
-  --agent-runtime-id "<runtime-id>" \
+  --agent-runtime-id "$RUNTIME_ID" \
   --profile pn-playground-admin \
   --region ap-northeast-1 \
   --query 'status'
@@ -354,8 +384,11 @@ aws bedrock-agentcore-control get-agent-runtime \
 #### 2.6.1 Runtimeステータスの確認
 
 ```bash
+# Runtime IDを取得（まだ設定していない場合）
+export RUNTIME_ID=$(cd terraform && terraform output -raw agent_runtime_id)
+
 aws bedrock-agentcore-control get-agent-runtime \
-  --agent-runtime-id "<runtime-id>" \
+  --agent-runtime-id "$RUNTIME_ID" \
   --profile pn-playground-admin \
   --region ap-northeast-1 \
   --query 'status'
@@ -514,6 +547,22 @@ cat response.json
 # => "Your name is Kaita." ← 前の会話を記憶している
 ```
 
+```sh
+❯ RUNTIME_ARN=$(cd terraform && terraform output -raw agent_runtime_arn)
+SESSION_ID="test-session-$(date +%s)-afghikjklmno"
+PAYLOAD=$(printf '{"prompt":"List  CloudWatch alarms using MCP", "sessionId":"%s"}' "$SESSION_ID" | base64)
+
+aws bedrock-agentcore invoke-agent-runtime \
+  --agent-runtime-arn "$RUNTIME_ARN" \
+  --payload "$PAYLOAD" \
+  --content-type "application/json" \
+  --accept "text/event-stream" \
+  --runtime-session-id "$SESSION_ID" \
+  --profile pn-playground-admin \
+  --region ap-northeast-1 \
+  response.json && cat response.json
+```
+
 **注意**: プロンプトに`!`を含めるとzshでエスケープされ400エラーになります。`!`を含まない文字列を使用してください。
 
 ---
@@ -528,8 +577,10 @@ cat response.json
 
 **確認方法**:
 ```bash
+export RUNTIME_ID=$(cd terraform && terraform output -raw agent_runtime_id)
+
 aws logs describe-log-streams \
-  --log-group-name "/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT" \
+  --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT" \
   --profile pn-playground-admin
 ```
 
@@ -623,16 +674,19 @@ aws bedrock-agentcore invoke-agent-runtime \
 ### CloudWatch Logsの確認
 
 ```bash
+# Runtime IDを取得（まだ設定していない場合）
+export RUNTIME_ID=$(cd terraform && terraform output -raw agent_runtime_id)
+
 # ログストリーム一覧
 aws logs describe-log-streams \
-  --log-group-name "/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT" \
+  --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT" \
   --order-by LastEventTime \
   --descending \
   --profile pn-playground-admin
 
 # ログイベント取得
 aws logs filter-log-events \
-  --log-group-name "/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT" \
+  --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT" \
   --start-time $(($(date +%s) * 1000 - 3600000)) \
   --profile pn-playground-admin
 ```

@@ -96,6 +96,23 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
           "bedrock-agentcore:ListMemoryRecords"
         ]
         Resource = "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:memory/*"
+      },
+      {
+        Sid    = "AgentCoreGateway"
+        Effect = "Allow"
+        Action = [
+          "bedrock-agentcore:InvokeGateway"
+        ]
+        Resource = var.enable_cloudwatch_mcp ? aws_bedrockagentcore_gateway.main[0].gateway_arn : "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:gateway/*"
+      },
+      {
+        Sid    = "BedrockResponsesAPI"
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ]
+        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
       }
     ]
   })
@@ -111,7 +128,7 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
 
   agent_runtime_artifact {
     container_configuration {
-      container_uri = "${aws_ecr_repository.agent.repository_url}@sha256:2770219b624242ddead7a91e60acc6e03a86d06390b30b22578a0b3d940ea8eb"
+      container_uri = "${aws_ecr_repository.agent.repository_url}:latest"
     }
   }
 
@@ -119,11 +136,19 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     network_mode = "PUBLIC"
   }
 
-  environment_variables = {
-    AWS_REGION       = var.aws_region
-    BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
-    MEMORY_ID        = aws_bedrockagentcore_memory.main.id
-  }
+  environment_variables = merge(
+    {
+      AWS_REGION       = var.aws_region
+      BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
+      MEMORY_ID        = aws_bedrockagentcore_memory.main.id
+    },
+    var.enable_cloudwatch_mcp ? {
+      GATEWAY_ARN = aws_bedrockagentcore_gateway.main[0].gateway_arn
+    } : {},
+    {
+      TEST = "tsejddjst"
+    }
+  )
 
   depends_on = [aws_bedrockagentcore_memory_strategy.semantic]
 }
