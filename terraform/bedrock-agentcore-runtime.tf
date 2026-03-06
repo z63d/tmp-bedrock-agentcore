@@ -82,6 +82,17 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
         Resource = "arn:aws:logs:${var.aws_region}:${local.account_id}:*"
       },
       {
+        Sid    = "XRayTracing"
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules",
+          "xray:GetSamplingTargets"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "AgentCoreMemory"
         Effect = "Allow"
         Action = [
@@ -138,12 +149,12 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
 
   environment_variables = {
     AWS_REGION       = var.aws_region
-    BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
+    BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
     MEMORY_ID        = aws_bedrockagentcore_memory.main.id
-    GATEWAY_ARN      = aws_bedrockagentcore_gateway.main.gateway_arn
+    GATEWAY_ID       = aws_bedrockagentcore_gateway.main.gateway_id
     # Python-specific settings
     PYTHONUNBUFFERED = "1"
-    TEST             = "test-env-1adad"
+    TEST             = "test-env-1dsaddjdad"
   }
 
   depends_on = [aws_bedrockagentcore_memory_strategy.semantic]
@@ -154,7 +165,7 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
 #------------------------------------------------------------------------------
 
 resource "aws_cloudwatch_log_group" "agentcore_runtime" {
-  name              = "/aws/vendedlogs/bedrock-agentcore/${var.project_name}"
+  name              = "/aws/bedrock-agentcore/runtimes/${aws_bedrockagentcore_agent_runtime.main.agent_runtime_id}-DEFAULT"
   retention_in_days = 30
 }
 

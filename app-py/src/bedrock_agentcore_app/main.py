@@ -1,10 +1,10 @@
 """
 Bedrock AgentCore Application Entry Point.
 
-Phase 3: Agent with Calculator tool and Memory integration.
+Phase 4: Agent with Calculator tool, Memory, and MCP Gateway integration.
 - Calculator tool for mathematical operations
 - Memory for conversation history storage and retrieval
-- No MCP Gateway
+- MCP Gateway for external tools (CloudWatch Logs)
 """
 
 from __future__ import annotations
@@ -17,8 +17,10 @@ from typing import Any, AsyncIterator
 import boto3
 import structlog
 from bedrock_agentcore import BedrockAgentCoreApp
+from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
 from strands import Agent, tool
 from strands.models import BedrockModel
+from strands.tools.mcp import MCPClient
 
 
 # =============================================================================
@@ -139,6 +141,7 @@ logger = structlog.get_logger()
 region = os.environ.get("AWS_REGION", "ap-northeast-1")
 model_id = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
 memory_id = os.environ.get("MEMORY_ID")
+gateway_id = os.environ.get("GATEWAY_ID")
 
 # Initialize Memory Client (optional)
 memory_client: MemoryClient | None = None
@@ -147,6 +150,25 @@ if memory_id:
     logger.info("Memory enabled", memory_id=memory_id)
 else:
     logger.info("Memory disabled (MEMORY_ID not set)")
+
+# Initialize MCP Gateway Client (optional)
+mcp_client: MCPClient | None = None
+if gateway_id:
+    gateway_url = f"https://{gateway_id}.gateway.bedrock-agentcore.{region}.amazonaws.com/mcp"
+    try:
+        mcp_client = MCPClient(
+            lambda: aws_iam_streamablehttp_client(
+                endpoint=gateway_url,
+                aws_region=region,
+                aws_service="bedrock-agentcore",
+            )
+        )
+        logger.info("MCP Gateway enabled", gateway_id=gateway_id, gateway_url=gateway_url)
+    except Exception as e:
+        logger.error("Failed to initialize MCP Gateway client", error=str(e), gateway_id=gateway_id)
+        mcp_client = None
+else:
+    logger.info("MCP Gateway disabled (GATEWAY_ID not set)")
 
 # Create BedrockAgentCoreApp instance
 app = BedrockAgentCoreApp()
@@ -162,12 +184,19 @@ def get_agent() -> Agent:
     if _agent is not None:
         return _agent
 
-    logger.info("Creating agent", region=region, model_id=model_id)
+    logger.info("Creating agent", region=region, model_id=model_id, mcp_enabled=mcp_client is not None)
 
     system_prompt = """You are a helpful assistant.
 
 When asked to perform calculations, use the calculator tool.
-The calculator supports: add, subtract, multiply, divide operations."""
+The calculator supports: add, subtract, multiply, divide operations.
+
+You also have access to CloudWatch Logs tools via MCP Gateway if enabled."""
+
+    # Build tools list
+    tools: list[Any] = [calculator]
+    if mcp_client:
+        tools.append(mcp_client)
 
     _agent = Agent(
         model=BedrockModel(
@@ -175,7 +204,7 @@ The calculator supports: add, subtract, multiply, divide operations."""
             model_id=model_id,
             max_tokens=4096,
         ),
-        tools=[calculator],
+        tools=tools,
         system_prompt=system_prompt,
     )
 
@@ -256,6 +285,7 @@ def main() -> None:
         region=region,
         model_id=model_id,
         memory_enabled=memory_client is not None,
+        mcp_enabled=mcp_client is not None,
     )
     app.run()
 

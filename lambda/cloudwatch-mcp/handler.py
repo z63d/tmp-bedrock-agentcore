@@ -62,8 +62,10 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             arguments = event  # Event IS the arguments
             logger.info(f"Executing tool '{tool_name_from_context}' with args: {json.dumps(arguments)[:500]}")
             result = execute_tool(tool_name_from_context, arguments)
+            response = json.dumps(result, default=str)
+            logger.info(f"Tool result: {response[:2000]}")
             # Return result as plain JSON string (not wrapped in JSON-RPC)
-            return json.dumps(result, default=str)
+            return response
 
         # API Gateway / Direct invocation: JSON-RPC format
         body = event

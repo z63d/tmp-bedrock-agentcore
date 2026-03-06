@@ -190,6 +190,140 @@ resource "aws_bedrockagentcore_gateway_target" "cloudwatch_mcp" {
               }
             }
           }
+
+          inline_payload {
+            name        = "analyze_metric"
+            description = "Analyze a CloudWatch metric for trends, anomalies, and statistics. Provides summary statistics and identifies patterns."
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "namespace"
+                type        = "string"
+                description = "CloudWatch namespace"
+                required    = true
+              }
+
+              property {
+                name        = "metric_name"
+                type        = "string"
+                description = "Name of the metric to analyze"
+                required    = true
+              }
+
+              property {
+                name        = "hours"
+                type        = "integer"
+                description = "Number of hours to analyze (default: 24)"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "get_alarm_history"
+            description = "Get history of state changes for a specific alarm. Useful for understanding alarm patterns."
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "alarm_name"
+                type        = "string"
+                description = "Name of the alarm to get history for"
+                required    = true
+              }
+
+              property {
+                name        = "history_item_type"
+                type        = "string"
+                description = "Type of history items: ConfigurationUpdate, StateUpdate, Action (default: StateUpdate)"
+                required    = false
+              }
+
+              property {
+                name        = "max_records"
+                type        = "integer"
+                description = "Maximum number of history records (default: 50)"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "analyze_log_group"
+            description = "Analyze a CloudWatch log group for error patterns and anomalies within a time window."
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "log_group_name"
+                type        = "string"
+                description = "Name of the log group to analyze"
+                required    = true
+              }
+
+              property {
+                name        = "hours"
+                type        = "integer"
+                description = "Number of hours to analyze (default: 1)"
+                required    = false
+              }
+
+              property {
+                name        = "filter_pattern"
+                type        = "string"
+                description = "CloudWatch Logs filter pattern (e.g., ERROR, Exception)"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "execute_log_insights_query"
+            description = "Execute a CloudWatch Logs Insights query for advanced log analysis."
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "log_group_name"
+                type        = "string"
+                description = "Name of the log group to query"
+                required    = true
+              }
+
+              property {
+                name        = "query_string"
+                type        = "string"
+                description = "Logs Insights query string (e.g., 'fields @timestamp, @message | filter @message like /ERROR/')"
+                required    = true
+              }
+
+              property {
+                name        = "start_time"
+                type        = "string"
+                description = "ISO8601 start time (default: 1 hour ago)"
+                required    = false
+              }
+
+              property {
+                name        = "end_time"
+                type        = "string"
+                description = "ISO8601 end time (default: now)"
+                required    = false
+              }
+
+              property {
+                name        = "limit"
+                type        = "integer"
+                description = "Maximum number of results (default: 100)"
+                required    = false
+              }
+            }
+          }
         }
       }
     }
