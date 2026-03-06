@@ -33,6 +33,16 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app/src
 
+# OpenTelemetry configuration
+ENV OTEL_PYTHON_DISTRO=aws_distro
+ENV OTEL_PYTHON_CONFIGURATOR=aws_configurator
+ENV OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+ENV OTEL_TRACES_EXPORTER=otlp
+ENV OTEL_RESOURCE_ATTRIBUTES=service.name=bedrock-agentcore-app
+ENV OTEL_EXPORTER_OTLP_LOGS_HEADERS="x-aws-log-group=/aws/vendedlogs/bedrock-agentcore/bedrock-agentcore-ts,x-aws-log-stream=default,x-aws-metric-namespace=bedrock-agentcore"
+ENV AGENT_OBSERVABILITY_ENABLED=true
+
 EXPOSE 8080
 
-CMD ["python", "-m", "bedrock_agentcore_app.main"]
+# Run with OpenTelemetry instrumentation
+CMD ["opentelemetry-instrument", "python", "-m", "bedrock_agentcore_app.main"]
