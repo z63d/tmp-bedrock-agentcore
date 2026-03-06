@@ -10,11 +10,11 @@ export class AgentCoreClient {
   private agentRuntimeArn: string;
   private sessionId: string;
 
-  constructor(config: AgentConfig) {
+  constructor(config: AgentConfig, sessionId?: string) {
     this.client = new BedrockAgentCoreClient({ region: config.region });
     this.agentRuntimeArn = config.agentRuntimeArn;
     // Session ID must be 33+ characters
-    this.sessionId = `cli-${randomUUID()}-${Date.now()}`;
+    this.sessionId = sessionId ?? `cli-${randomUUID()}-${Date.now()}`;
   }
 
   getSessionId(): string {

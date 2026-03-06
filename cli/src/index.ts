@@ -9,6 +9,7 @@ async function main() {
     options: {
       interactive: { type: "boolean", short: "i" },
       help: { type: "boolean", short: "h" },
+      session: { type: "string", short: "s" },
     },
     allowPositionals: true,
   });
@@ -21,12 +22,13 @@ Usage:
   npm run cli -- [options] [prompt]
 
 Options:
-  -i, --interactive  Start interactive REPL mode
-  -h, --help         Show this help message
+  -i, --interactive      Start interactive REPL mode
+  -s, --session <id>     Use existing session ID (resume conversation)
+  -h, --help             Show this help message
 
 Examples:
   npm run cli -- "What is machine learning?"
-  npm run cli -- -i
+  npm run cli -- -s "cli-abc123-1234567890"
   npm run cli
 
 Environment Variables:
@@ -37,7 +39,7 @@ Environment Variables:
   }
 
   const config = loadConfig();
-  const client = new AgentCoreClient(config);
+  const client = new AgentCoreClient(config, values.session);
 
   // If no arguments or -i flag, start REPL
   if (values.interactive || positionals.length === 0) {
