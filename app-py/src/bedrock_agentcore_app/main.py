@@ -1,10 +1,9 @@
 """
 Bedrock AgentCore Application Entry Point.
 
-Phase 4: Agent with Calculator tool, Memory, and MCP Gateway integration.
-- Calculator tool for mathematical operations
+Agent with Memory and MCP Gateway integration.
 - Memory for conversation history storage and retrieval
-- MCP Gateway for external tools (CloudWatch Logs)
+- MCP Gateway for external tools (CloudWatch, Rollbar)
 """
 
 from __future__ import annotations
@@ -18,42 +17,9 @@ import boto3
 import structlog
 from bedrock_agentcore import BedrockAgentCoreApp
 from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
-from strands import Agent, tool
+from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
-
-
-# =============================================================================
-# Tools
-# =============================================================================
-
-
-@tool
-def calculator(operation: str, a: float, b: float) -> str:
-    """
-    Perform mathematical calculations.
-
-    Args:
-        operation: The mathematical operation to perform (add, subtract, multiply, divide)
-        a: First number
-        b: Second number
-
-    Returns:
-        Result of the calculation as a formatted string
-    """
-    match operation:
-        case "add":
-            return f"Result: {a} + {b} = {a + b}"
-        case "subtract":
-            return f"Result: {a} - {b} = {a - b}"
-        case "multiply":
-            return f"Result: {a} * {b} = {a * b}"
-        case "divide":
-            if b == 0:
-                return "Error: Division by zero"
-            return f"Result: {a} / {b} = {a / b}"
-        case _:
-            return f"Unknown operation: {operation}"
 
 
 # =============================================================================
@@ -186,15 +152,10 @@ def get_agent() -> Agent:
 
     logger.info("Creating agent", region=region, model_id=model_id, mcp_enabled=mcp_client is not None)
 
-    system_prompt = """You are a helpful assistant.
-
-When asked to perform calculations, use the calculator tool.
-The calculator supports: add, subtract, multiply, divide operations.
-
-You also have access to CloudWatch Logs tools via MCP Gateway if enabled."""
+    system_prompt = """You are a helpful assistant with access to CloudWatch and Rollbar tools via MCP Gateway."""
 
     # Build tools list
-    tools: list[Any] = [calculator]
+    tools: list[Any] = []
     if mcp_client:
         tools.append(mcp_client)
 
