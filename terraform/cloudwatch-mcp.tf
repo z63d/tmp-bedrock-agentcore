@@ -7,7 +7,6 @@
 #------------------------------------------------------------------------------
 
 resource "aws_ecr_repository" "cloudwatch_mcp" {
-  count                = var.enable_cloudwatch_mcp ? 1 : 0
   name                 = "${var.project_name}-cloudwatch-mcp"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
@@ -22,8 +21,7 @@ resource "aws_ecr_repository" "cloudwatch_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_iam_role" "cloudwatch_mcp_lambda" {
-  count = var.enable_cloudwatch_mcp ? 1 : 0
-  name  = "${var.project_name}-cloudwatch-mcp-lambda"
+  name = "${var.project_name}-cloudwatch-mcp-lambda"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -40,9 +38,8 @@ resource "aws_iam_role" "cloudwatch_mcp_lambda" {
 }
 
 resource "aws_iam_role_policy" "cloudwatch_mcp_lambda" {
-  count = var.enable_cloudwatch_mcp ? 1 : 0
-  name  = "${var.project_name}-cloudwatch-mcp-policy"
-  role  = aws_iam_role.cloudwatch_mcp_lambda[0].id
+  name = "${var.project_name}-cloudwatch-mcp-policy"
+  role = aws_iam_role.cloudwatch_mcp_lambda.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -92,12 +89,11 @@ resource "aws_iam_role_policy" "cloudwatch_mcp_lambda" {
 #------------------------------------------------------------------------------
 
 resource "aws_lambda_function" "cloudwatch_mcp" {
-  count         = var.enable_cloudwatch_mcp ? 1 : 0
   function_name = "${var.project_name}-cloudwatch-mcp"
-  role          = aws_iam_role.cloudwatch_mcp_lambda[0].arn
+  role          = aws_iam_role.cloudwatch_mcp_lambda.arn
 
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.cloudwatch_mcp[0].repository_url}:latest"
+  image_uri     = "${aws_ecr_repository.cloudwatch_mcp.repository_url}:latest"
   architectures = ["arm64"]
 
   memory_size = var.cloudwatch_mcp_lambda_memory
@@ -117,7 +113,6 @@ resource "aws_lambda_function" "cloudwatch_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_api_gateway_rest_api" "cloudwatch_mcp" {
-  count       = var.enable_cloudwatch_mcp ? 1 : 0
   name        = "${var.project_name}-cloudwatch-mcp"
   description = "CloudWatch MCP Server API for AgentCore Gateway integration"
 
@@ -128,38 +123,34 @@ resource "aws_api_gateway_rest_api" "cloudwatch_mcp" {
 
 # /mcp resource
 resource "aws_api_gateway_resource" "mcp" {
-  count       = var.enable_cloudwatch_mcp ? 1 : 0
-  rest_api_id = aws_api_gateway_rest_api.cloudwatch_mcp[0].id
-  parent_id   = aws_api_gateway_rest_api.cloudwatch_mcp[0].root_resource_id
+  rest_api_id = aws_api_gateway_rest_api.cloudwatch_mcp.id
+  parent_id   = aws_api_gateway_rest_api.cloudwatch_mcp.root_resource_id
   path_part   = "mcp"
 }
 
 # POST method with IAM authorization
 resource "aws_api_gateway_method" "mcp_post" {
-  count         = var.enable_cloudwatch_mcp ? 1 : 0
-  rest_api_id   = aws_api_gateway_rest_api.cloudwatch_mcp[0].id
-  resource_id   = aws_api_gateway_resource.mcp[0].id
+  rest_api_id   = aws_api_gateway_rest_api.cloudwatch_mcp.id
+  resource_id   = aws_api_gateway_resource.mcp.id
   http_method   = "POST"
   authorization = "AWS_IAM"
 }
 
 # Lambda integration
 resource "aws_api_gateway_integration" "lambda" {
-  count                   = var.enable_cloudwatch_mcp ? 1 : 0
-  rest_api_id             = aws_api_gateway_rest_api.cloudwatch_mcp[0].id
-  resource_id             = aws_api_gateway_resource.mcp[0].id
-  http_method             = aws_api_gateway_method.mcp_post[0].http_method
+  rest_api_id             = aws_api_gateway_rest_api.cloudwatch_mcp.id
+  resource_id             = aws_api_gateway_resource.mcp.id
+  http_method             = aws_api_gateway_method.mcp_post.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.cloudwatch_mcp[0].invoke_arn
+  uri                     = aws_lambda_function.cloudwatch_mcp.invoke_arn
 }
 
 # Method response
 resource "aws_api_gateway_method_response" "mcp_post_200" {
-  count       = var.enable_cloudwatch_mcp ? 1 : 0
-  rest_api_id = aws_api_gateway_rest_api.cloudwatch_mcp[0].id
-  resource_id = aws_api_gateway_resource.mcp[0].id
-  http_method = aws_api_gateway_method.mcp_post[0].http_method
+  rest_api_id = aws_api_gateway_rest_api.cloudwatch_mcp.id
+  resource_id = aws_api_gateway_resource.mcp.id
+  http_method = aws_api_gateway_method.mcp_post.http_method
   status_code = "200"
 
   response_models = {
@@ -169,14 +160,13 @@ resource "aws_api_gateway_method_response" "mcp_post_200" {
 
 # Deployment
 resource "aws_api_gateway_deployment" "cloudwatch_mcp" {
-  count       = var.enable_cloudwatch_mcp ? 1 : 0
-  rest_api_id = aws_api_gateway_rest_api.cloudwatch_mcp[0].id
+  rest_api_id = aws_api_gateway_rest_api.cloudwatch_mcp.id
 
   triggers = {
     redeployment = sha1(jsonencode([
-      aws_api_gateway_resource.mcp[0].id,
-      aws_api_gateway_method.mcp_post[0].id,
-      aws_api_gateway_integration.lambda[0].id,
+      aws_api_gateway_resource.mcp.id,
+      aws_api_gateway_method.mcp_post.id,
+      aws_api_gateway_integration.lambda.id,
     ]))
   }
 
@@ -189,13 +179,12 @@ resource "aws_api_gateway_deployment" "cloudwatch_mcp" {
 
 # Stage
 resource "aws_api_gateway_stage" "prod" {
-  count         = var.enable_cloudwatch_mcp ? 1 : 0
-  rest_api_id   = aws_api_gateway_rest_api.cloudwatch_mcp[0].id
-  deployment_id = aws_api_gateway_deployment.cloudwatch_mcp[0].id
+  rest_api_id   = aws_api_gateway_rest_api.cloudwatch_mcp.id
+  deployment_id = aws_api_gateway_deployment.cloudwatch_mcp.id
   stage_name    = "prod"
 
   access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.api_gateway[0].arn
+    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
     format = jsonencode({
       requestId      = "$context.requestId"
       ip             = "$context.identity.sourceIp"
@@ -213,17 +202,15 @@ resource "aws_api_gateway_stage" "prod" {
 
 # CloudWatch Log Group for API Gateway
 resource "aws_cloudwatch_log_group" "api_gateway" {
-  count             = var.enable_cloudwatch_mcp ? 1 : 0
   name              = "/aws/api-gateway/${var.project_name}-cloudwatch-mcp"
   retention_in_days = 7
 }
 
 # Lambda permission for API Gateway
 resource "aws_lambda_permission" "api_gateway" {
-  count         = var.enable_cloudwatch_mcp ? 1 : 0
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.cloudwatch_mcp[0].function_name
+  function_name = aws_lambda_function.cloudwatch_mcp.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.cloudwatch_mcp[0].execution_arn}/*/*"
+  source_arn    = "${aws_api_gateway_rest_api.cloudwatch_mcp.execution_arn}/*/*"
 }

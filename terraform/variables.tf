@@ -19,12 +19,6 @@ variable "project_name" {
 # CloudWatch MCP Server Variables
 #------------------------------------------------------------------------------
 
-variable "enable_cloudwatch_mcp" {
-  description = "Enable CloudWatch MCP Server integration"
-  type        = bool
-  default     = true
-}
-
 variable "cloudwatch_mcp_lambda_memory" {
   description = "Memory size for CloudWatch MCP Lambda in MB"
   type        = number

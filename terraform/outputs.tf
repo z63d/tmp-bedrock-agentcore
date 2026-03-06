@@ -44,25 +44,25 @@ output "memory_arn" {
 
 output "cloudwatch_mcp_ecr_repository_url" {
   description = "URL of the CloudWatch MCP ECR repository"
-  value       = var.enable_cloudwatch_mcp ? aws_ecr_repository.cloudwatch_mcp[0].repository_url : null
+  value       = aws_ecr_repository.cloudwatch_mcp.repository_url
 }
 
 output "cloudwatch_mcp_lambda_arn" {
   description = "ARN of the CloudWatch MCP Lambda function"
-  value       = var.enable_cloudwatch_mcp ? aws_lambda_function.cloudwatch_mcp[0].arn : null
+  value       = aws_lambda_function.cloudwatch_mcp.arn
 }
 
 output "cloudwatch_mcp_api_url" {
   description = "URL of the CloudWatch MCP API Gateway endpoint"
-  value       = var.enable_cloudwatch_mcp ? "${aws_api_gateway_stage.prod[0].invoke_url}/mcp" : null
+  value       = "${aws_api_gateway_stage.prod.invoke_url}/mcp"
 }
 
 output "gateway_id" {
   description = "ID of the AgentCore Gateway"
-  value       = var.enable_cloudwatch_mcp ? aws_bedrockagentcore_gateway.main[0].gateway_id : null
+  value       = aws_bedrockagentcore_gateway.main.gateway_id
 }
 
 output "gateway_arn" {
   description = "ARN of the AgentCore Gateway"
-  value       = var.enable_cloudwatch_mcp ? aws_bedrockagentcore_gateway.main[0].gateway_arn : null
+  value       = aws_bedrockagentcore_gateway.main.gateway_arn
 }

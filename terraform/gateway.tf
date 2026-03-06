@@ -7,8 +7,7 @@
 #------------------------------------------------------------------------------
 
 resource "aws_iam_role" "gateway" {
-  count = var.enable_cloudwatch_mcp ? 1 : 0
-  name  = "${var.project_name}-gateway"
+  name = "${var.project_name}-gateway"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -30,9 +29,8 @@ resource "aws_iam_role" "gateway" {
 }
 
 resource "aws_iam_role_policy" "gateway" {
-  count = var.enable_cloudwatch_mcp ? 1 : 0
-  name  = "${var.project_name}-gateway-policy"
-  role  = aws_iam_role.gateway[0].id
+  name = "${var.project_name}-gateway-policy"
+  role = aws_iam_role.gateway.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -43,7 +41,7 @@ resource "aws_iam_role_policy" "gateway" {
         Action = [
           "execute-api:Invoke"
         ]
-        Resource = "${aws_api_gateway_rest_api.cloudwatch_mcp[0].execution_arn}/*"
+        Resource = "${aws_api_gateway_rest_api.cloudwatch_mcp.execution_arn}/*"
       },
       {
         Sid    = "InvokeLambda"
@@ -51,7 +49,7 @@ resource "aws_iam_role_policy" "gateway" {
         Action = [
           "lambda:InvokeFunction"
         ]
-        Resource = aws_lambda_function.cloudwatch_mcp[0].arn
+        Resource = aws_lambda_function.cloudwatch_mcp.arn
       }
     ]
   })
@@ -62,9 +60,8 @@ resource "aws_iam_role_policy" "gateway" {
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_gateway" "main" {
-  count    = var.enable_cloudwatch_mcp ? 1 : 0
   name     = var.project_name
-  role_arn = aws_iam_role.gateway[0].arn
+  role_arn = aws_iam_role.gateway.arn
 
   # Required: Protocol type
   protocol_type = "MCP"
@@ -90,9 +87,8 @@ resource "aws_bedrockagentcore_gateway" "main" {
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_gateway_target" "cloudwatch_mcp" {
-  count              = var.enable_cloudwatch_mcp ? 1 : 0
   name               = "cloudwatch-mcp-server"
-  gateway_identifier = aws_bedrockagentcore_gateway.main[0].gateway_id
+  gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
   description        = "CloudWatch MCP Server Lambda target"
 
   # Use Gateway's IAM role for authentication
@@ -105,7 +101,7 @@ resource "aws_bedrockagentcore_gateway_target" "cloudwatch_mcp" {
   target_configuration {
     mcp {
       lambda {
-        lambda_arn = aws_lambda_function.cloudwatch_mcp[0].arn
+        lambda_arn = aws_lambda_function.cloudwatch_mcp.arn
 
         tool_schema {
           inline_payload {

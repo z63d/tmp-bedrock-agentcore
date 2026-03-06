@@ -103,7 +103,7 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
         Action = [
           "bedrock-agentcore:InvokeGateway"
         ]
-        Resource = var.enable_cloudwatch_mcp ? aws_bedrockagentcore_gateway.main[0].gateway_arn : "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:gateway/*"
+        Resource = aws_bedrockagentcore_gateway.main.gateway_arn
       },
       {
         Sid    = "BedrockResponsesAPI"
@@ -136,19 +136,12 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     network_mode = "PUBLIC"
   }
 
-  environment_variables = merge(
-    {
-      AWS_REGION       = var.aws_region
-      BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
-      MEMORY_ID        = aws_bedrockagentcore_memory.main.id
-    },
-    var.enable_cloudwatch_mcp ? {
-      GATEWAY_ARN = aws_bedrockagentcore_gateway.main[0].gateway_arn
-    } : {},
-    {
-      TEST = "tsejddjst"
-    }
-  )
+  environment_variables = {
+    AWS_REGION       = var.aws_region
+    BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
+    MEMORY_ID        = aws_bedrockagentcore_memory.main.id
+    GATEWAY_ARN      = aws_bedrockagentcore_gateway.main.gateway_arn
+  }
 
   depends_on = [aws_bedrockagentcore_memory_strategy.semantic]
 }
