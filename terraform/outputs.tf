@@ -52,10 +52,11 @@ output "cloudwatch_mcp_lambda_arn" {
   value       = aws_lambda_function.cloudwatch_mcp.arn
 }
 
-output "cloudwatch_mcp_api_url" {
-  description = "URL of the CloudWatch MCP API Gateway endpoint"
-  value       = "${aws_api_gateway_stage.prod.invoke_url}/mcp"
-}
+# API Gateway is not used - AgentCore Gateway calls Lambda directly
+# output "cloudwatch_mcp_api_url" {
+#   description = "URL of the CloudWatch MCP API Gateway endpoint"
+#   value       = "${aws_api_gateway_stage.prod.invoke_url}/mcp"
+# }
 
 output "gateway_id" {
   description = "ID of the AgentCore Gateway"

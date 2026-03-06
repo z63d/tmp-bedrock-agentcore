@@ -35,14 +35,15 @@ resource "aws_iam_role_policy" "gateway" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      {
-        Sid    = "InvokeAPIGateway"
-        Effect = "Allow"
-        Action = [
-          "execute-api:Invoke"
-        ]
-        Resource = "${aws_api_gateway_rest_api.cloudwatch_mcp.execution_arn}/*"
-      },
+      # API Gateway is not used - AgentCore Gateway calls Lambda directly
+      # {
+      #   Sid    = "InvokeAPIGateway"
+      #   Effect = "Allow"
+      #   Action = [
+      #     "execute-api:Invoke"
+      #   ]
+      #   Resource = "${aws_api_gateway_rest_api.cloudwatch_mcp.execution_arn}/*"
+      # },
       {
         Sid    = "InvokeLambda"
         Effect = "Allow"
