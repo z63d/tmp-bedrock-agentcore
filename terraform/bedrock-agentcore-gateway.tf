@@ -1,5 +1,5 @@
 #------------------------------------------------------------------------------
-# AgentCore Gateway + CloudWatch MCP Target
+# AgentCore Gateway + MCP Targets
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -73,12 +73,12 @@ resource "aws_bedrockagentcore_gateway" "main" {
   # MCP protocol configuration
   protocol_configuration {
     mcp {
-      instructions       = "CloudWatch MCP Server providing observability tools for metrics, alarms, and logs analysis."
+      instructions       = "MCP Gateway providing various tools for AWS operations and observability."
       supported_versions = ["2025-03-26"]
     }
   }
 
-  description = "AgentCore Gateway for CloudWatch MCP Server integration"
+  description = "AgentCore MCP Gateway for tool integrations"
 
   depends_on = [aws_iam_role_policy.gateway]
 }
