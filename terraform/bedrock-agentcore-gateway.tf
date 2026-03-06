@@ -50,7 +50,10 @@ resource "aws_iam_role_policy" "gateway" {
         Action = [
           "lambda:InvokeFunction"
         ]
-        Resource = aws_lambda_function.cloudwatch_mcp.arn
+        Resource = [
+          aws_lambda_function.cloudwatch_mcp.arn,
+          aws_lambda_function.rollbar_mcp.arn
+        ]
       }
     ]
   })
@@ -194,6 +197,233 @@ resource "aws_bedrockagentcore_gateway_target" "cloudwatch_mcp" {
 
   depends_on = [
     aws_lambda_function.cloudwatch_mcp,
+    aws_bedrockagentcore_gateway.main
+  ]
+}
+
+#------------------------------------------------------------------------------
+# Gateway Target - Rollbar MCP Server (Lambda)
+#------------------------------------------------------------------------------
+
+resource "aws_bedrockagentcore_gateway_target" "rollbar_mcp" {
+  name               = "rollbar-mcp-server"
+  gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
+  description        = "Rollbar MCP Server Lambda target for error tracking and monitoring"
+
+  # Use Gateway's IAM role for authentication
+  credential_provider_configuration {
+    gateway_iam_role {}
+  }
+
+  # Target configuration for Lambda-based MCP server
+  target_configuration {
+    mcp {
+      lambda {
+        lambda_arn = aws_lambda_function.rollbar_mcp.arn
+
+        tool_schema {
+          # get-item-details
+          inline_payload {
+            name        = "get-item-details"
+            description = "Get detailed information about a Rollbar item by its counter, including the last occurrence data"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "counter"
+                type        = "integer"
+                description = "Rollbar item counter"
+                required    = true
+              }
+
+              property {
+                name        = "max_tokens"
+                type        = "integer"
+                description = "Maximum tokens for occurrence data in response (default: 20000)"
+                required    = false
+              }
+            }
+          }
+
+          # get-deployments
+          inline_payload {
+            name        = "get-deployments"
+            description = "Get deployment status and information for a Rollbar project"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "limit"
+                type        = "integer"
+                description = "Number of deployments to retrieve"
+                required    = true
+              }
+            }
+          }
+
+          # get-version
+          inline_payload {
+            name        = "get-version"
+            description = "Get version data and information for a Rollbar project"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "version"
+                type        = "string"
+                description = "Version string (e.g. git sha)"
+                required    = true
+              }
+
+              property {
+                name        = "environment"
+                type        = "string"
+                description = "Environment name (default: production)"
+                required    = false
+              }
+            }
+          }
+
+          # get-top-items
+          inline_payload {
+            name        = "get-top-items"
+            description = "Get list of top active items in the Rollbar project for the last 24 hours"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "environment"
+                type        = "string"
+                description = "Environment name (default: production)"
+                required    = false
+              }
+            }
+          }
+
+          # list-items
+          inline_payload {
+            name        = "list-items"
+            description = "List all items in the Rollbar project with optional search and filtering"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "status"
+                type        = "string"
+                description = "Filter by item status: active, resolved, muted, archived (default: active)"
+                required    = false
+              }
+
+              property {
+                name        = "environment"
+                type        = "string"
+                description = "Filter by environment (default: production)"
+                required    = false
+              }
+
+              property {
+                name        = "page"
+                type        = "integer"
+                description = "Page number for pagination (default: 1)"
+                required    = false
+              }
+
+              property {
+                name        = "limit"
+                type        = "integer"
+                description = "Number of items per page (default: 20, max: 5000)"
+                required    = false
+              }
+
+              property {
+                name        = "query"
+                type        = "string"
+                description = "Search query to filter items by title or content"
+                required    = false
+              }
+            }
+          }
+
+          # update-item
+          inline_payload {
+            name        = "update-item"
+            description = "Update an item in Rollbar (status, level, title, assignment, etc.)"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "itemId"
+                type        = "integer"
+                description = "The ID of the item to update"
+                required    = true
+              }
+
+              property {
+                name        = "status"
+                type        = "string"
+                description = "The new status: active, resolved, muted, archived"
+                required    = false
+              }
+
+              property {
+                name        = "level"
+                type        = "string"
+                description = "The new level: debug, info, warning, error, critical"
+                required    = false
+              }
+
+              property {
+                name        = "title"
+                type        = "string"
+                description = "The new title for the item"
+                required    = false
+              }
+            }
+          }
+
+          # get-replay
+          inline_payload {
+            name        = "get-replay"
+            description = "Get session replay data for a specific replay in Rollbar"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "environment"
+                type        = "string"
+                description = "Environment name (e.g., production)"
+                required    = true
+              }
+
+              property {
+                name        = "sessionId"
+                type        = "string"
+                description = "Session identifier that owns the replay"
+                required    = true
+              }
+
+              property {
+                name        = "replayId"
+                type        = "string"
+                description = "Replay identifier to retrieve"
+                required    = true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  depends_on = [
+    aws_lambda_function.rollbar_mcp,
     aws_bedrockagentcore_gateway.main
   ]
 }

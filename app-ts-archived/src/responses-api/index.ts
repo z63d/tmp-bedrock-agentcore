@@ -1,7 +1,7 @@
 /**
  * Responses API Module
  *
- * Exports CloudWatch client for use with Bedrock Responses API
+ * Exports CloudWatch and Rollbar clients for use with Bedrock Responses API
  * and AgentCore Gateway.
  */
 export {
@@ -10,3 +10,9 @@ export {
   type CloudWatchResponse,
   type ToolExecutionResult,
 } from "./cloudwatch-client.js";
+
+export {
+  RollbarResponsesClient,
+  type RollbarClientConfig,
+  type RollbarResponse,
+} from "./rollbar-client.js";

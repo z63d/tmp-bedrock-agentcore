@@ -1,0 +1,25 @@
+{
+  "name": "rollbar-mcp-lambda",
+  "version": "1.0.0",
+  "description": "Rollbar MCP Server for AWS Lambda",
+  "type": "module",
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ssm": "^3.782.0",
+    "rollbar": "^3.0.0-alpha.6",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.149",
+    "@types/node": "^22.15.21",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

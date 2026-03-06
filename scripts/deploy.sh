@@ -8,11 +8,7 @@ AWS_PROFILE="pn-playground-admin"
 cd "$(dirname "$0")/../terraform"
 ECR_REPO=$(terraform output -raw ecr_repository_url)
 
-cd ../app
-
-# Build TypeScript
-echo "Building TypeScript..."
-npm run build
+cd ../app-py
 
 # Docker build
 echo "Building Docker image..."

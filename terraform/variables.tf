@@ -30,3 +30,25 @@ variable "cloudwatch_mcp_lambda_timeout" {
   type        = number
   default     = 30
 }
+
+#------------------------------------------------------------------------------
+# Rollbar MCP Server Variables
+#------------------------------------------------------------------------------
+
+variable "rollbar_mcp_lambda_memory" {
+  description = "Memory size for Rollbar MCP Lambda in MB"
+  type        = number
+  default     = 512
+}
+
+variable "rollbar_mcp_lambda_timeout" {
+  description = "Timeout for Rollbar MCP Lambda in seconds"
+  type        = number
+  default     = 30
+}
+
+variable "rollbar_access_token" {
+  description = "Rollbar API access token (sensitive)"
+  type        = string
+  sensitive   = true
+}

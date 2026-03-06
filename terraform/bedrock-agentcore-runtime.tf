@@ -141,7 +141,38 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
     MEMORY_ID        = aws_bedrockagentcore_memory.main.id
     GATEWAY_ARN      = aws_bedrockagentcore_gateway.main.gateway_arn
+    # Python-specific settings
+    PYTHONUNBUFFERED = "1"
+    TEST             = "test-env-1adad"
   }
 
   depends_on = [aws_bedrockagentcore_memory_strategy.semantic]
+}
+
+#------------------------------------------------------------------------------
+# CloudWatch Logs for AgentCore Runtime
+#------------------------------------------------------------------------------
+
+resource "aws_cloudwatch_log_group" "agentcore_runtime" {
+  name              = "/aws/vendedlogs/bedrock-agentcore/${var.project_name}"
+  retention_in_days = 30
+}
+
+resource "aws_cloudwatch_log_delivery_source" "agentcore_runtime" {
+  name         = "${var.project_name}-agentcore-runtime"
+  log_type     = "APPLICATION_LOGS"
+  resource_arn = aws_bedrockagentcore_agent_runtime.main.agent_runtime_arn
+}
+
+resource "aws_cloudwatch_log_delivery_destination" "agentcore_runtime" {
+  name = "${var.project_name}-agentcore-runtime"
+
+  delivery_destination_configuration {
+    destination_resource_arn = aws_cloudwatch_log_group.agentcore_runtime.arn
+  }
+}
+
+resource "aws_cloudwatch_log_delivery" "agentcore_runtime" {
+  delivery_source_name     = aws_cloudwatch_log_delivery_source.agentcore_runtime.name
+  delivery_destination_arn = aws_cloudwatch_log_delivery_destination.agentcore_runtime.arn
 }
