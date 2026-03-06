@@ -1,8 +1,8 @@
 """
 Bedrock AgentCore Application Entry Point.
 
-Phase 1: LLM-only agent with streaming response.
-- No tools
+Phase 2: Agent with Calculator tool.
+- Calculator tool for mathematical operations
 - No memory
 - No MCP Gateway
 """
@@ -15,8 +15,41 @@ from typing import Any, AsyncIterator
 
 import structlog
 from bedrock_agentcore import BedrockAgentCoreApp
-from strands import Agent
+from strands import Agent, tool
 from strands.models import BedrockModel
+
+
+# =============================================================================
+# Tools
+# =============================================================================
+
+
+@tool
+def calculator(operation: str, a: float, b: float) -> str:
+    """
+    Perform mathematical calculations.
+
+    Args:
+        operation: The mathematical operation to perform (add, subtract, multiply, divide)
+        a: First number
+        b: Second number
+
+    Returns:
+        Result of the calculation as a formatted string
+    """
+    match operation:
+        case "add":
+            return f"Result: {a} + {b} = {a + b}"
+        case "subtract":
+            return f"Result: {a} - {b} = {a - b}"
+        case "multiply":
+            return f"Result: {a} * {b} = {a * b}"
+        case "divide":
+            if b == 0:
+                return "Error: Division by zero"
+            return f"Result: {a} / {b} = {a / b}"
+        case _:
+            return f"Unknown operation: {operation}"
 
 # Configure structured logging (JSON format)
 structlog.configure(
@@ -68,13 +101,19 @@ def get_agent() -> Agent:
         model_id=model_id,
     )
 
+    system_prompt = """You are a helpful assistant.
+
+When asked to perform calculations, use the calculator tool.
+The calculator supports: add, subtract, multiply, divide operations."""
+
     _agent = Agent(
         model=BedrockModel(
             region_name=region,
             model_id=model_id,
             max_tokens=4096,
         ),
-        system_prompt="You are a helpful assistant.",
+        tools=[calculator],
+        system_prompt=system_prompt,
     )
 
     return _agent
