@@ -154,7 +154,7 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     GATEWAY_ID       = aws_bedrockagentcore_gateway.main.gateway_id
     # Python-specific settings
     PYTHONUNBUFFERED = "1"
-    TEST             = "test-env-1dsaddjdad"
+    TEST             = "test-env-1dsdjad"
   }
 
   depends_on = [aws_bedrockagentcore_memory_strategy.semantic]

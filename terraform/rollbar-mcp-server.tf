@@ -3,18 +3,21 @@
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-# SSM Parameter for Rollbar Access Token
+# AgentCore Identity - API Key Credential Provider for Rollbar
 #------------------------------------------------------------------------------
 
-resource "aws_ssm_parameter" "rollbar_access_token" {
-  name        = "/rollbar/mcp/access-token"
-  description = "Rollbar API access token for MCP server"
-  type        = "SecureString"
-  value       = var.rollbar_access_token
+resource "aws_bedrockagentcore_api_key_credential_provider" "rollbar" {
+  name               = "rollbar-api-key"
+  api_key_wo         = var.rollbar_access_token
+  api_key_wo_version = 1
+}
 
-  lifecycle {
-    ignore_changes = [value]
-  }
+#------------------------------------------------------------------------------
+# AgentCore Identity - Workload Identity for Rollbar MCP Lambda
+#------------------------------------------------------------------------------
+
+resource "aws_bedrockagentcore_workload_identity" "rollbar_mcp" {
+  name = "${var.project_name}-rollbar-mcp"
 }
 
 #------------------------------------------------------------------------------
@@ -60,14 +63,6 @@ resource "aws_iam_role_policy" "rollbar_mcp_lambda" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "SSMGetParameter"
-        Effect = "Allow"
-        Action = [
-          "ssm:GetParameter"
-        ]
-        Resource = "arn:aws:ssm:${var.aws_region}:${local.account_id}:parameter/rollbar/mcp/access-token"
-      },
-      {
         Sid    = "LambdaLogging"
         Effect = "Allow"
         Action = [
@@ -76,6 +71,39 @@ resource "aws_iam_role_policy" "rollbar_mcp_lambda" {
           "logs:PutLogEvents"
         ]
         Resource = "arn:aws:logs:${var.aws_region}:${local.account_id}:log-group:/aws/lambda/${var.project_name}-rollbar-mcp:*"
+      },
+      {
+        Sid    = "GetWorkloadAccessToken"
+        Effect = "Allow"
+        Action = [
+          "bedrock-agentcore:GetWorkloadAccessToken",
+          "bedrock-agentcore:GetWorkloadAccessTokenForUserId"
+        ]
+        Resource = [
+          "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:workload-identity-directory/default",
+          aws_bedrockagentcore_workload_identity.rollbar_mcp.workload_identity_arn
+        ]
+      },
+      {
+        Sid    = "GetResourceApiKey"
+        Effect = "Allow"
+        Action = [
+          "bedrock-agentcore:GetResourceApiKey"
+        ]
+        Resource = [
+          "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:workload-identity-directory/default",
+          aws_bedrockagentcore_workload_identity.rollbar_mcp.workload_identity_arn,
+          "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:token-vault/default",
+          aws_bedrockagentcore_api_key_credential_provider.rollbar.credential_provider_arn
+        ]
+      },
+      {
+        Sid    = "GetSecretValue"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_bedrockagentcore_api_key_credential_provider.rollbar.api_key_secret_arn[0].secret_arn
       }
     ]
   })
@@ -98,7 +126,9 @@ resource "aws_lambda_function" "rollbar_mcp" {
 
   environment {
     variables = {
-      AWS_REGION_NAME = var.aws_region
+      AWS_REGION_NAME                  = var.aws_region
+      WORKLOAD_IDENTITY_NAME           = aws_bedrockagentcore_workload_identity.rollbar_mcp.name
+      API_KEY_CREDENTIAL_PROVIDER_NAME = aws_bedrockagentcore_api_key_credential_provider.rollbar.name
     }
   }
 
