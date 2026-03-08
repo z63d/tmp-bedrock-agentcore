@@ -81,3 +81,17 @@ output "rollbar_mcp_lambda_arn" {
   description = "ARN of the Rollbar MCP Lambda function"
   value       = aws_lambda_function.rollbar_mcp.arn
 }
+
+#------------------------------------------------------------------------------
+# New Relic MCP Server Outputs
+#------------------------------------------------------------------------------
+
+output "newrelic_mcp_ecr_repository_url" {
+  description = "URL of the New Relic MCP ECR repository"
+  value       = aws_ecr_repository.newrelic_mcp.repository_url
+}
+
+output "newrelic_mcp_lambda_arn" {
+  description = "ARN of the New Relic MCP Lambda function"
+  value       = aws_lambda_function.newrelic_mcp.arn
+}

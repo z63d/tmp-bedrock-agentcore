@@ -52,7 +52,8 @@ resource "aws_iam_role_policy" "gateway" {
         ]
         Resource = [
           aws_lambda_function.cloudwatch_mcp.arn,
-          aws_lambda_function.rollbar_mcp.arn
+          aws_lambda_function.rollbar_mcp.arn,
+          aws_lambda_function.newrelic_mcp.arn
         ]
       }
     ]
@@ -558,6 +559,738 @@ resource "aws_bedrockagentcore_gateway_target" "rollbar_mcp" {
 
   depends_on = [
     aws_lambda_function.rollbar_mcp,
+    aws_bedrockagentcore_gateway.main
+  ]
+}
+
+#------------------------------------------------------------------------------
+# Gateway Target - New Relic MCP Server (Lambda Proxy)
+#------------------------------------------------------------------------------
+
+resource "aws_bedrockagentcore_gateway_target" "newrelic_mcp" {
+  name               = "newrelic-mcp-server"
+  gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
+  description        = "New Relic MCP Server Lambda proxy for observability data"
+
+  # Use Gateway's IAM role for authentication
+  credential_provider_configuration {
+    gateway_iam_role {}
+  }
+
+  # Target configuration for Lambda-based MCP proxy
+  target_configuration {
+    mcp {
+      lambda {
+        lambda_arn = aws_lambda_function.newrelic_mcp.arn
+
+        tool_schema {
+          # Account Discovery
+          inline_payload {
+            name        = "list_available_new_relic_accounts"
+            description = "Lists all New Relic account IDs accessible to the authenticated user"
+
+            input_schema {
+              type = "object"
+            }
+          }
+
+          # Entity and Account Management
+          inline_payload {
+            name        = "get_entity"
+            description = "Fetch New Relic entities by GUID or search by name pattern"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "The exact entity ID when you know it"
+                required    = false
+              }
+
+              property {
+                name        = "name_pattern"
+                type        = "string"
+                description = "Search pattern with wildcards: 'webapp' (contains), 'prod%' (starts with), '%api' (ends with)"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "list_entity_types"
+            description = "List the complete catalog of New Relic entity types with domain/type definitions"
+
+            input_schema {
+              type = "object"
+            }
+          }
+
+          inline_payload {
+            name        = "list_related_entities"
+            description = "List entities 1 hop away (related) from a given entity GUID"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "The GUID of the entity to find related entities for"
+                required    = true
+              }
+            }
+          }
+
+          # Data Access
+          inline_payload {
+            name        = "execute_nrql_query"
+            description = "Execute an NRQL query against NRDB"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+
+              property {
+                name        = "nrql_query"
+                type        = "string"
+                description = "NRQL query string. Example: SELECT count(*) FROM Transaction WHERE appName = 'MyApp' SINCE 1 hour ago"
+                required    = true
+              }
+            }
+          }
+
+          # Alerting and Monitoring
+          # Alerting and Monitoring
+          inline_payload {
+            name        = "list_recent_issues"
+            description = "Lists all recent (last 24 hours) issues in New Relic for the specified account"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+
+              property {
+                name        = "cursor"
+                type        = "string"
+                description = "Pagination cursor from previous response"
+                required    = false
+              }
+            }
+          }
+
+          # Performance Analytics
+          inline_payload {
+            name        = "analyze_golden_metrics"
+            description = "Analyze golden metrics (throughput, response time, errors) for an entity"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "Entity GUID to analyze"
+                required    = true
+              }
+
+              property {
+                name        = "time_period"
+                type        = "string"
+                description = "Time period (e.g., 'last 30 minutes')"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "list_recent_logs"
+            description = "List recent logs from New Relic for the specified account and entity GUID"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "Entity GUID to get logs for"
+                required    = true
+              }
+
+              property {
+                name        = "number_of_logs"
+                type        = "integer"
+                description = "The number of recent logs to retrieve"
+                required    = true
+              }
+
+              property {
+                name        = "history_period_minutes"
+                type        = "integer"
+                description = "The time period in minutes to look back for logs"
+                required    = true
+              }
+            }
+          }
+
+          # Advanced Analysis
+          inline_payload {
+            name        = "analyze_deployment_impact"
+            description = "Analyze the performance impact of a deployment on a specific entity"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "Entity GUID to analyze"
+                required    = true
+              }
+
+              property {
+                name        = "deployment_id"
+                type        = "string"
+                description = "Deployment ID to analyze"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "generate_alert_insights_report"
+            description = "Generate an alert intelligence analysis report for a specific issue"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "issue_id"
+                type        = "string"
+                description = "Issue ID to generate report for"
+                required    = true
+              }
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "generate_user_impact_report"
+            description = "Generate an end-user impact analysis report for a specific issue"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "issue_id"
+                type        = "string"
+                description = "Issue ID to generate report for"
+                required    = true
+              }
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+            }
+          }
+
+          # Utilities
+          inline_payload {
+            name        = "convert_time_period_to_epoch_ms"
+            description = "Convert a time period (e.g., 'last 30 minutes') to epoch milliseconds"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "time_period"
+                type        = "string"
+                description = "Time period to convert"
+                required    = true
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "get_dashboard"
+            description = "Fetch details about a specific dashboard"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "dashboard_guid"
+                type        = "string"
+                description = "Dashboard GUID to fetch"
+                required    = true
+              }
+            }
+          }
+
+          # Alerting
+          inline_payload {
+            name        = "list_alert_policies"
+            description = "Lists alert policies for the specified account, optionally filtering by policy name"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+
+              property {
+                name        = "policy_name"
+                type        = "string"
+                description = "Policy name filter (optional, uses partial matching)"
+                required    = false
+              }
+
+              property {
+                name        = "cursor"
+                type        = "string"
+                description = "Pagination cursor from previous response"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "list_alert_conditions"
+            description = "Retrieves alert condition details for a specific alert policy"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+
+              property {
+                name        = "policyId"
+                type        = "integer"
+                description = "The ID of the alert policy to query"
+                required    = true
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "search_incident"
+            description = "Retrieve all alert incident events (both open and close events) from New Relic with flexible filtering"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "The GUID of the entity to look up alert events for"
+                required    = false
+              }
+
+              property {
+                name        = "issue_id"
+                type        = "string"
+                description = "The issue ID to look up alert events for"
+                required    = false
+              }
+
+              property {
+                name        = "start_time_ms"
+                type        = "integer"
+                description = "Start time in epoch ms format"
+                required    = false
+              }
+
+              property {
+                name        = "end_time_ms"
+                type        = "integer"
+                description = "End time in epoch ms format"
+                required    = false
+              }
+            }
+          }
+
+          # Synthetics
+          inline_payload {
+            name        = "list_synthetic_monitors"
+            description = "Lists synthetic monitors for the specified account"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+
+              property {
+                name        = "limit"
+                type        = "integer"
+                description = "Maximum number of monitors to return (default: 50)"
+                required    = false
+              }
+
+              property {
+                name        = "cursor"
+                type        = "string"
+                description = "Pagination cursor from previous response"
+                required    = false
+              }
+            }
+          }
+
+          # Dashboards
+          inline_payload {
+            name        = "list_dashboards"
+            description = "Lists all dashboards for a New Relic account"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+
+              property {
+                name        = "limit"
+                type        = "integer"
+                description = "Maximum number of dashboards to return (default: 50)"
+                required    = false
+              }
+
+              property {
+                name        = "cursor"
+                type        = "string"
+                description = "Pagination cursor from previous response"
+                required    = false
+              }
+            }
+          }
+
+          # Entity Search
+          inline_payload {
+            name        = "search_entity_with_tag"
+            description = "Searches for entities in New Relic using tag key and value pairs"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "tag_key"
+                type        = "string"
+                description = "The tag key to filter entities (e.g., 'environment', 'team')"
+                required    = false
+              }
+
+              property {
+                name        = "tag_value"
+                type        = "string"
+                description = "The tag value to filter entities (e.g., 'production', 'backend')"
+                required    = false
+              }
+
+              property {
+                name        = "limit"
+                type        = "integer"
+                description = "Maximum number of entities to return (default: 50)"
+                required    = false
+              }
+
+              property {
+                name        = "cursor"
+                type        = "string"
+                description = "Pagination cursor from previous response"
+                required    = false
+              }
+            }
+          }
+
+          # Natural Language Query
+          inline_payload {
+            name        = "natural_language_to_nrql_query"
+            description = "Converts a natural language request into an NRQL query and executes it"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "user_request"
+                type        = "string"
+                description = "Natural language request (e.g., 'Show me error rate for my app in the last hour')"
+                required    = true
+              }
+
+              property {
+                name        = "account_id"
+                type        = "integer"
+                description = "New Relic account ID"
+                required    = true
+              }
+            }
+          }
+
+          # Analysis Tools
+          inline_payload {
+            name        = "analyze_entity_logs"
+            description = "Analyzes application logs to identify error patterns, anomalous behavior, and recurring issues"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "The unique New Relic GUID of the entity"
+                required    = true
+              }
+
+              property {
+                name        = "start_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for start of analysis"
+                required    = true
+              }
+
+              property {
+                name        = "end_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for end of analysis"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "analyze_transactions"
+            description = "Analyzes transactions for a specific entity, identifying slow and error-prone transactions"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "The unique New Relic GUID of the entity"
+                required    = true
+              }
+
+              property {
+                name        = "start_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for start of analysis"
+                required    = true
+              }
+
+              property {
+                name        = "end_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for end of analysis"
+                required    = false
+              }
+
+              property {
+                name        = "error_transaction_limit"
+                type        = "integer"
+                description = "Maximum number of error transactions to include"
+                required    = true
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "analyze_threads"
+            description = "Analyzes thread metric data including thread state, CPU usage, and memory consumption"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "The unique New Relic GUID of the entity"
+                required    = true
+              }
+
+              property {
+                name        = "start_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for start of analysis"
+                required    = true
+              }
+
+              property {
+                name        = "end_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for end of analysis"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "analyze_kafka_metrics"
+            description = "Analyzes Kafka metrics including consumer lag, producer throughput, and message latency"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "The unique New Relic GUID of the Kafka entity"
+                required    = true
+              }
+
+              property {
+                name        = "start_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for start of analysis"
+                required    = true
+              }
+
+              property {
+                name        = "end_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for end of analysis"
+                required    = false
+              }
+            }
+          }
+
+          # Error Groups
+          inline_payload {
+            name        = "list_entity_error_groups"
+            description = "Fetches error groups for a specific entity from the Errors Inbox"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "The unique New Relic GUID of the entity"
+                required    = true
+              }
+
+              property {
+                name        = "start_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for start of analysis"
+                required    = true
+              }
+
+              property {
+                name        = "end_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for end of analysis"
+                required    = false
+              }
+            }
+          }
+
+          # Garbage Collection
+          inline_payload {
+            name        = "list_garbage_collection_metrics"
+            description = "Retrieves garbage collection and memory metrics for an entity"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "The unique New Relic GUID of the entity"
+                required    = false
+              }
+
+              property {
+                name        = "start_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for start"
+                required    = false
+              }
+
+              property {
+                name        = "end_time_ms"
+                type        = "integer"
+                description = "Epoch timestamp in milliseconds for end"
+                required    = false
+              }
+            }
+          }
+
+          # Change Events
+          inline_payload {
+            name        = "list_change_events"
+            description = "Retrieves a history of change events (deployments, configurations) from New Relic for an entity"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "entity_guid"
+                type        = "string"
+                description = "The unique identifier for the entity"
+                required    = true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  depends_on = [
+    aws_lambda_function.newrelic_mcp,
     aws_bedrockagentcore_gateway.main
   ]
 }

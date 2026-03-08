@@ -3,7 +3,7 @@ Bedrock AgentCore Application Entry Point.
 
 Agent with Memory and MCP Gateway integration.
 - Memory for conversation history storage and retrieval
-- MCP Gateway for external tools (CloudWatch, Rollbar)
+- MCP Gateway for external tools (CloudWatch, Rollbar, New Relic, etc.)
 """
 
 from __future__ import annotations
