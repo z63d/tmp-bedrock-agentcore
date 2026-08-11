@@ -3,6 +3,8 @@ set -e
 
 AWS_REGION="ap-northeast-1"
 AWS_PROFILE="pn-playground-admin"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DOCKER_CONFIG="$REPO_ROOT/.docker-tmp"
 
 # Get ECR URL from Terraform
 cd "$(dirname "$0")/../terraform"
@@ -18,8 +20,12 @@ npm run build
 echo "Building Docker image for Rollbar MCP..."
 docker build --platform linux/arm64 -t rollbar-mcp .
 
-# ECR login
+# ECR login (isolated config to avoid credHelpers interference)
 echo "Logging in to ECR..."
+DOCKER_HOST=$(docker context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null || true)
+export DOCKER_HOST
+mkdir -p "$DOCKER_CONFIG"
+export DOCKER_CONFIG
 aws ecr get-login-password --region "$AWS_REGION" --profile "$AWS_PROFILE" | \
   docker login --username AWS --password-stdin "$ECR_REPO"
 
@@ -27,6 +33,7 @@ aws ecr get-login-password --region "$AWS_REGION" --profile "$AWS_PROFILE" | \
 echo "Pushing to ECR..."
 docker tag rollbar-mcp:latest "$ECR_REPO:latest"
 docker push "$ECR_REPO:latest"
+rm -rf "$DOCKER_CONFIG"
 
 # Update Lambda function
 echo "Updating Lambda function..."
