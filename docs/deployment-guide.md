@@ -52,9 +52,9 @@ ECR リポジトリ・IAM ロール・Memory・Gateway は正常に作成され�
 # エージェント本体
 ./scripts/deploy.sh
 
-# MCP サーバー（必要なものだけ）
-./scripts/deploy-cloudwatch-mcp.sh
+# MCP サーバー（Rollbar のみ Lambda）
 ./scripts/deploy-rollbar-mcp.sh
+# CloudWatch は AWS 公式 MCP、New Relic は公式 MCP サーバー経由のため Lambda 不要
 ```
 
 各スクリプトは `terraform output` から ECR URL を取得し、arm64 でビルドして push する。
@@ -111,7 +111,7 @@ aws bedrock-agentcore-control get-agent-runtime \
 ### MCP サーバー（Lambda）
 
 ```bash
-./scripts/deploy-cloudwatch-mcp.sh  # または rollbar
+./scripts/deploy-rollbar-mcp.sh
 ```
 
 Lambda は `update-function-code` で即時反映される。

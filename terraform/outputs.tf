@@ -38,25 +38,6 @@ output "memory_arn" {
   value       = aws_bedrockagentcore_memory.main.arn
 }
 
-#------------------------------------------------------------------------------
-# CloudWatch MCP Server Outputs
-#------------------------------------------------------------------------------
-
-output "cloudwatch_mcp_ecr_repository_url" {
-  description = "URL of the CloudWatch MCP ECR repository"
-  value       = aws_ecr_repository.cloudwatch_mcp.repository_url
-}
-
-output "cloudwatch_mcp_lambda_arn" {
-  description = "ARN of the CloudWatch MCP Lambda function"
-  value       = aws_lambda_function.cloudwatch_mcp.arn
-}
-
-# API Gateway is not used - AgentCore Gateway calls Lambda directly
-# output "cloudwatch_mcp_api_url" {
-#   description = "URL of the CloudWatch MCP API Gateway endpoint"
-#   value       = "${aws_api_gateway_stage.prod.invoke_url}/mcp"
-# }
 
 output "gateway_id" {
   description = "ID of the AgentCore Gateway"

@@ -80,7 +80,7 @@ AgentCore Runtime と各種ツールバックエンドの間を中継するマ�
 
 | ターゲット       | 種別              | 言語       | 主なツール                                             |
 | ---------------- | ----------------- | ---------- | ------------------------------------------------------ |
-| `cloudwatch-mcp` | Lambda            | Python     | CloudWatch Logs/Metrics/Alarms の取得・分析            |
+| `aws-mcp`        | MCP Server (公式) | —          | 任意の AWS API (CloudWatch 含む) を `call_aws` で実行  |
 | `rollbar-mcp`    | Lambda            | TypeScript | エラーアイテム一覧、詳細、デプロイ履歴、ステータス更新 |
 | `newrelic-mcp`   | MCP Server (公式) | —          | NRQL クエリ実行、エンティティ検索、アラート取得        |
 
@@ -95,7 +95,7 @@ AgentCore Runtime と各種ツールバックエンドの間を中継するマ�
    モデルが get_active_alarms / analyze_log_group 等を選択
 
 4. Runtime → Gateway (InvokeGateway, SigV4)
-   Gateway → cloudwatch-mcp Lambda → CloudWatch API
+   Gateway → aws-mcp → CloudWatch API
 
 5. 結果を受け取り、モデルが自然言語で分析結果を生成
 
@@ -114,10 +114,10 @@ AgentCore Runtime と各種ツールバックエンドの間を中継するマ�
 | CloudWatch Log Group          | `bedrock-agentcore-runtime.tf` | Runtime ログ             |
 | AgentCore Memory              | `bedrock-agentcore-memory.tf`  | セマンティック記憶       |
 | AgentCore Gateway             | `bedrock-agentcore-gateway.tf` | MCP Gateway              |
-| ECR + Lambda (cloudwatch-mcp) | `cloudwatch-mcp-server.tf`     | CloudWatch MCP            |
 | ECR + Lambda (rollbar-mcp)    | `rollbar-mcp-server.tf`        | Rollbar MCP               |
 | API Key Credential Provider   | `newrelic-mcp-server.tf`       | New Relic 公式 MCP 認証用 |
 | MCP Server Target (newrelic)  | `bedrock-agentcore-gateway.tf` | New Relic 公式 MCP 接続   |
+| MCP Server Target (aws-mcp)  | `bedrock-agentcore-gateway.tf` | AWS 公式 MCP (CloudWatch 等) |
 
 ## IAM 権限
 

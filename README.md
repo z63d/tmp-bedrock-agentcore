@@ -12,7 +12,6 @@ AgentCore Memory（会話履歴のセマンティック検索）と AgentCore Ga
 | ------------------------ | --------------------------------------------------------------- |
 | `app-py/`                | **現行**の AgentCore Runtime アプリ（Python / Strands Agents）  |
 | `cli/`                   | Runtime を呼び出す CLI ツール（TypeScript）                     |
-| `lambda/cloudwatch-mcp/` | CloudWatch MCP サーバー（Python, Lambda）                       |
 | `lambda/rollbar-mcp/`    | Rollbar MCP サーバー（TypeScript, Lambda）                      |
 | `terraform/`             | インフラ定義（ECR / IAM / Runtime / Memory / Gateway / Lambda） |
 | `scripts/`               | ビルド & デプロイスクリプト                                     |
@@ -26,9 +25,7 @@ cd terraform && terraform init && terraform apply
 
 # 2. コンテナをビルド & ECR に push
 ./scripts/deploy.sh
-./scripts/deploy-cloudwatch-mcp.sh  # 使うものだけ
 ./scripts/deploy-rollbar-mcp.sh
-
 # 3. Terraform 再 apply（Runtime を作成）
 cd terraform && terraform apply
 
@@ -45,5 +42,4 @@ npm run cli -- "過去1時間の CloudWatch アラームを一覧して"
 - [`docs/architecture.md`](docs/architecture.md) — システム構成・データフロー・IAM 権限
 - [`docs/deployment-guide.md`](docs/deployment-guide.md) — デプロイ手順・ローカル開発・トラブルシューティング
 - [`docs/memory-api-reference.md`](docs/memory-api-reference.md) — AgentCore Memory API リファレンス
-- [`docs/cloudwatch-mcp-usage.md`](docs/cloudwatch-mcp-usage.md) — CloudWatch MCP の使い方
 </content>

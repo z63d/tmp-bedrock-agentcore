@@ -51,7 +51,6 @@ resource "aws_iam_role_policy" "gateway" {
           "lambda:InvokeFunction"
         ]
         Resource = [
-          aws_lambda_function.cloudwatch_mcp.arn,
           aws_lambda_function.rollbar_mcp.arn
         ]
       },
@@ -91,6 +90,11 @@ resource "aws_iam_role_policy" "gateway" {
       }
     ]
   })
+}
+
+resource "aws_iam_role_policy_attachment" "gateway_readonly" {
+  role       = aws_iam_role.gateway.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
 }
 
 #------------------------------------------------------------------------------
@@ -146,255 +150,6 @@ resource "aws_cloudwatch_log_delivery_destination" "gateway" {
 resource "aws_cloudwatch_log_delivery" "gateway" {
   delivery_source_name     = aws_cloudwatch_log_delivery_source.gateway.name
   delivery_destination_arn = aws_cloudwatch_log_delivery_destination.gateway.arn
-}
-
-#------------------------------------------------------------------------------
-# Gateway Target - CloudWatch MCP Server (Lambda)
-#------------------------------------------------------------------------------
-
-resource "aws_bedrockagentcore_gateway_target" "cloudwatch_mcp" {
-  name               = "cloudwatch-mcp-server"
-  gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
-  description        = "CloudWatch MCP Server Lambda target"
-
-  # Use Gateway's IAM role for authentication
-  credential_provider_configuration {
-    gateway_iam_role {}
-  }
-
-  # Target configuration for Lambda-based MCP server
-  # Each tool is defined individually in the toolSchema
-  target_configuration {
-    mcp {
-      lambda {
-        lambda_arn = aws_lambda_function.cloudwatch_mcp.arn
-
-        tool_schema {
-          inline_payload {
-            name        = "get_active_alarms"
-            description = "Get all active CloudWatch alarms in ALARM or INSUFFICIENT_DATA state. Useful for identifying current issues."
-
-            input_schema {
-              type = "object"
-
-              property {
-                name        = "state_value"
-                type        = "string"
-                description = "Filter by alarm state: ALARM, INSUFFICIENT_DATA, or OK (default: ALARM)"
-                required    = false
-              }
-
-              property {
-                name        = "alarm_name_prefix"
-                type        = "string"
-                description = "Filter alarms by name prefix"
-                required    = false
-              }
-            }
-          }
-
-          inline_payload {
-            name        = "get_metric_data"
-            description = "Retrieve CloudWatch metric data for analysis. Returns time series data for specified metrics."
-
-            input_schema {
-              type = "object"
-
-              property {
-                name        = "namespace"
-                type        = "string"
-                description = "CloudWatch namespace (e.g., AWS/EC2, AWS/Lambda, AWS/RDS)"
-                required    = true
-              }
-
-              property {
-                name        = "metric_name"
-                type        = "string"
-                description = "Name of the metric (e.g., CPUUtilization, Invocations)"
-                required    = true
-              }
-
-              property {
-                name        = "period"
-                type        = "integer"
-                description = "Data point period in seconds (default: 300)"
-                required    = false
-              }
-
-              property {
-                name        = "stat"
-                type        = "string"
-                description = "Statistic: Average, Sum, Minimum, Maximum (default: Average)"
-                required    = false
-              }
-            }
-          }
-
-          inline_payload {
-            name        = "describe_log_groups"
-            description = "List CloudWatch log groups with optional filtering."
-
-            input_schema {
-              type = "object"
-
-              property {
-                name        = "log_group_name_prefix"
-                type        = "string"
-                description = "Filter log groups by name prefix (e.g., /aws/lambda/)"
-                required    = false
-              }
-
-              property {
-                name        = "limit"
-                type        = "integer"
-                description = "Maximum number of log groups (default: 50)"
-                required    = false
-              }
-            }
-          }
-
-          inline_payload {
-            name        = "analyze_metric"
-            description = "Analyze a CloudWatch metric for trends, anomalies, and statistics. Provides summary statistics and identifies patterns."
-
-            input_schema {
-              type = "object"
-
-              property {
-                name        = "namespace"
-                type        = "string"
-                description = "CloudWatch namespace"
-                required    = true
-              }
-
-              property {
-                name        = "metric_name"
-                type        = "string"
-                description = "Name of the metric to analyze"
-                required    = true
-              }
-
-              property {
-                name        = "hours"
-                type        = "integer"
-                description = "Number of hours to analyze (default: 24)"
-                required    = false
-              }
-            }
-          }
-
-          inline_payload {
-            name        = "get_alarm_history"
-            description = "Get history of state changes for a specific alarm. Useful for understanding alarm patterns."
-
-            input_schema {
-              type = "object"
-
-              property {
-                name        = "alarm_name"
-                type        = "string"
-                description = "Name of the alarm to get history for"
-                required    = true
-              }
-
-              property {
-                name        = "history_item_type"
-                type        = "string"
-                description = "Type of history items: ConfigurationUpdate, StateUpdate, Action (default: StateUpdate)"
-                required    = false
-              }
-
-              property {
-                name        = "max_records"
-                type        = "integer"
-                description = "Maximum number of history records (default: 50)"
-                required    = false
-              }
-            }
-          }
-
-          inline_payload {
-            name        = "analyze_log_group"
-            description = "Analyze a CloudWatch log group for error patterns and anomalies within a time window."
-
-            input_schema {
-              type = "object"
-
-              property {
-                name        = "log_group_name"
-                type        = "string"
-                description = "Name of the log group to analyze"
-                required    = true
-              }
-
-              property {
-                name        = "hours"
-                type        = "integer"
-                description = "Number of hours to analyze (default: 1)"
-                required    = false
-              }
-
-              property {
-                name        = "filter_pattern"
-                type        = "string"
-                description = "CloudWatch Logs filter pattern (e.g., ERROR, Exception)"
-                required    = false
-              }
-            }
-          }
-
-          inline_payload {
-            name        = "execute_log_insights_query"
-            description = "Execute a CloudWatch Logs Insights query for advanced log analysis."
-
-            input_schema {
-              type = "object"
-
-              property {
-                name        = "log_group_name"
-                type        = "string"
-                description = "Name of the log group to query"
-                required    = true
-              }
-
-              property {
-                name        = "query_string"
-                type        = "string"
-                description = "Logs Insights query string (e.g., 'fields @timestamp, @message | filter @message like /ERROR/')"
-                required    = true
-              }
-
-              property {
-                name        = "start_time"
-                type        = "string"
-                description = "ISO8601 start time (default: 1 hour ago)"
-                required    = false
-              }
-
-              property {
-                name        = "end_time"
-                type        = "string"
-                description = "ISO8601 end time (default: now)"
-                required    = false
-              }
-
-              property {
-                name        = "limit"
-                type        = "integer"
-                description = "Maximum number of results (default: 100)"
-                required    = false
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  depends_on = [
-    aws_lambda_function.cloudwatch_mcp,
-    aws_bedrockagentcore_gateway.main
-  ]
 }
 
 #------------------------------------------------------------------------------
@@ -645,6 +400,34 @@ resource "aws_bedrockagentcore_gateway_target" "newrelic_mcp" {
     mcp {
       mcp_server {
         endpoint = "https://mcp.newrelic.com/mcp/"
+      }
+    }
+  }
+
+  depends_on = [aws_bedrockagentcore_gateway.main]
+}
+
+#------------------------------------------------------------------------------
+# Gateway Target - AWS MCP Server (official AWS remote MCP endpoint)
+#------------------------------------------------------------------------------
+
+resource "aws_bedrockagentcore_gateway_target" "aws_mcp" {
+  name               = "aws-mcp-server"
+  gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
+  description        = "AWS official MCP server for calling AWS APIs"
+
+  credential_provider_configuration {
+    gateway_iam_role {
+      service = "aws-mcp"
+      region  = "us-east-1"
+    }
+  }
+
+  target_configuration {
+    mcp {
+      mcp_server {
+        endpoint     = "https://aws-mcp.us-east-1.api.aws/mcp"
+        listing_mode = "DEFAULT"
       }
     }
   }

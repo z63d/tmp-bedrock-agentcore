@@ -16,22 +16,6 @@ variable "project_name" {
 }
 
 #------------------------------------------------------------------------------
-# CloudWatch MCP Server Variables
-#------------------------------------------------------------------------------
-
-variable "cloudwatch_mcp_lambda_memory" {
-  description = "Memory size for CloudWatch MCP Lambda in MB"
-  type        = number
-  default     = 512
-}
-
-variable "cloudwatch_mcp_lambda_timeout" {
-  description = "Timeout for CloudWatch MCP Lambda in seconds"
-  type        = number
-  default     = 30
-}
-
-#------------------------------------------------------------------------------
 # Rollbar MCP Server Variables
 #------------------------------------------------------------------------------
 
