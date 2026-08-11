@@ -8,17 +8,16 @@ AgentCore Memory（会話履歴のセマンティック検索）と AgentCore Ga
 
 ## ディレクトリ構成
 
-| ディレクトリ | 内容 |
-|------------|------|
-| `app-py/` | **現行**の AgentCore Runtime アプリ（Python / Strands Agents） |
-| `cli/` | Runtime を呼び出す CLI ツール（TypeScript） |
-| `lambda/cloudwatch-mcp/` | CloudWatch MCP サーバー（Python, Lambda） |
-| `lambda/rollbar-mcp/` | Rollbar MCP サーバー（TypeScript, Lambda） |
-| `lambda/newrelic-mcp/` | New Relic MCP サーバー（TypeScript, Lambda） |
-| `terraform/` | インフラ定義（ECR / IAM / Runtime / Memory / Gateway / Lambda） |
-| `scripts/` | ビルド & デプロイスクリプト |
-| `docs/` | 設計・デプロイ・API リファレンス |
-| `app-py-archived/`, `app-ts-archived/` | 旧実装（参考用、非稼働） |
+| ディレクトリ             | 内容                                                            |
+| ------------------------ | --------------------------------------------------------------- |
+| `app-py/`                | **現行**の AgentCore Runtime アプリ（Python / Strands Agents）  |
+| `cli/`                   | Runtime を呼び出す CLI ツール（TypeScript）                     |
+| `lambda/cloudwatch-mcp/` | CloudWatch MCP サーバー（Python, Lambda）                       |
+| `lambda/rollbar-mcp/`    | Rollbar MCP サーバー（TypeScript, Lambda）                      |
+| `lambda/newrelic-mcp/`   | New Relic MCP サーバー（TypeScript, Lambda）                    |
+| `terraform/`             | インフラ定義（ECR / IAM / Runtime / Memory / Gateway / Lambda） |
+| `scripts/`               | ビルド & デプロイスクリプト                                     |
+| `docs/`                  | 設計・デプロイ・API リファレンス                                |
 
 ## クイックスタート
 
