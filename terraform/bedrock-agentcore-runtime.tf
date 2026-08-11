@@ -164,7 +164,7 @@ import {
 
 resource "aws_cloudwatch_log_group" "agentcore_runtime" {
   name              = "/aws/bedrock-agentcore/runtimes/${aws_bedrockagentcore_agent_runtime.main.agent_runtime_id}-DEFAULT"
-  retention_in_days = 30
+  retention_in_days = 3
 }
 
 resource "aws_cloudwatch_log_delivery_source" "agentcore_runtime" {
