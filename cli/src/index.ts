@@ -50,6 +50,7 @@ Environment Variables:
     try {
       const response = await client.invoke(prompt);
       console.log(response);
+      console.log(`\nSession: ${client.getSessionId()}`);
     } catch (error) {
       if (error instanceof Error) {
         console.error(`Error: ${error.message}`);
