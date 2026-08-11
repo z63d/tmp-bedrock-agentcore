@@ -59,7 +59,11 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
           "bedrock:InvokeModel",
           "bedrock:InvokeModelWithResponseStream"
         ]
-        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
+        Resource = [
+          "arn:aws:bedrock:*::foundation-model/*",
+          "arn:aws:bedrock:*::inference-profile/*",
+          "arn:aws:bedrock:*:${local.account_id}:inference-profile/*"
+        ]
       },
       {
         Sid    = "ECRAccess"
@@ -116,15 +120,6 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
         ]
         Resource = aws_bedrockagentcore_gateway.main.gateway_arn
       },
-      {
-        Sid    = "BedrockResponsesAPI"
-        Effect = "Allow"
-        Action = [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream"
-        ]
-        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
-      }
     ]
   })
 }
@@ -149,7 +144,7 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
 
   environment_variables = {
     AWS_REGION       = var.aws_region
-    BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+    BEDROCK_MODEL_ID = "jp.anthropic.claude-haiku-4-5-20251001-v1:0"
     MEMORY_ID        = aws_bedrockagentcore_memory.main.id
     GATEWAY_ID       = aws_bedrockagentcore_gateway.main.gateway_id
     PYTHONUNBUFFERED = "1"

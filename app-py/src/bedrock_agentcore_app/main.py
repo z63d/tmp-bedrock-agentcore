@@ -105,7 +105,7 @@ logger = structlog.get_logger()
 # =============================================================================
 
 region = os.environ.get("AWS_REGION", "ap-northeast-1")
-model_id = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
+model_id = os.environ["BEDROCK_MODEL_ID"]
 memory_id = os.environ.get("MEMORY_ID")
 gateway_id = os.environ.get("GATEWAY_ID")
 
