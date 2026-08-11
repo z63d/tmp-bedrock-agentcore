@@ -32,8 +32,7 @@ AgentCore Runtime の作成には ECR にイメージが存在している必要
 ```hcl
 aws_profile          = "pn-playground-admin"
 rollbar_access_token = "xxxxx"
-newrelic_api_key     = "NRAK-xxxxx"
-# newrelic_default_account_id = "1234567"  # 任意
+newrelic_api_key     = "NRAK-xxxxx"  # Gateway → New Relic 公式 MCP のアウトバウンド認証用
 ```
 
 ### Step 2: 初回 Terraform apply
@@ -56,7 +55,6 @@ ECR リポジトリ・IAM ロール・Memory・Gateway は正常に作成され�
 # MCP サーバー（必要なものだけ）
 ./scripts/deploy-cloudwatch-mcp.sh
 ./scripts/deploy-rollbar-mcp.sh
-./scripts/deploy-newrelic-mcp.sh
 ```
 
 各スクリプトは `terraform output` から ECR URL を取得し、arm64 でビルドして push する。
@@ -113,7 +111,7 @@ aws bedrock-agentcore-control get-agent-runtime \
 ### MCP サーバー（Lambda）
 
 ```bash
-./scripts/deploy-cloudwatch-mcp.sh  # または rollbar / newrelic
+./scripts/deploy-cloudwatch-mcp.sh  # または rollbar
 ```
 
 Lambda は `update-function-code` で即時反映される。

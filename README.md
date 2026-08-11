@@ -4,7 +4,7 @@ Amazon Bedrock AgentCore 上で動く SRE / インシデント調査エージェ
 
 Strands Agents SDK で実装したエージェントをコンテナとして AgentCore Runtime にデプロイし、
 AgentCore Memory（会話履歴のセマンティック検索）と AgentCore Gateway 経由の MCP ツール
-（CloudWatch / Rollbar / New Relic）を組み合わせて、ログ・メトリクス・エラーを横断的に調査する。
+（CloudWatch / Rollbar は自前 Lambda、New Relic は公式 MCP サーバー）を組み合わせて、ログ・メトリクス・エラーを横断的に調査する。
 
 ## ディレクトリ構成
 
@@ -14,7 +14,6 @@ AgentCore Memory（会話履歴のセマンティック検索）と AgentCore Ga
 | `cli/`                   | Runtime を呼び出す CLI ツール（TypeScript）                     |
 | `lambda/cloudwatch-mcp/` | CloudWatch MCP サーバー（Python, Lambda）                       |
 | `lambda/rollbar-mcp/`    | Rollbar MCP サーバー（TypeScript, Lambda）                      |
-| `lambda/newrelic-mcp/`   | New Relic MCP サーバー（TypeScript, Lambda）                    |
 | `terraform/`             | インフラ定義（ECR / IAM / Runtime / Memory / Gateway / Lambda） |
 | `scripts/`               | ビルド & デプロイスクリプト                                     |
 | `docs/`                  | 設計・デプロイ・API リファレンス                                |
@@ -29,7 +28,6 @@ cd terraform && terraform init && terraform apply
 ./scripts/deploy.sh
 ./scripts/deploy-cloudwatch-mcp.sh  # 使うものだけ
 ./scripts/deploy-rollbar-mcp.sh
-./scripts/deploy-newrelic-mcp.sh
 
 # 3. Terraform 再 apply（Runtime を作成）
 cd terraform && terraform apply

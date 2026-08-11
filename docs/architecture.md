@@ -20,18 +20,18 @@
 │ AgentCore    │   │ AgentCore Gateway     │
 │ Memory       │   │ (MCP Protocol / IAM)  │
 │ (Semantic)   │   └──────┬───────────────┘
-└──────────────┘          │ Lambda 直接呼び出し
-                          ▼
-        ┌─────────────────┬─────────────────┐
-        ▼                 ▼                 ▼
-  ┌───────────┐    ┌───────────┐    ┌───────────┐
-  │CloudWatch │    │  Rollbar  │    │ New Relic │
-  │MCP(Lambda)│    │MCP(Lambda)│    │MCP(Lambda)│
-  └─────┬─────┘    └─────┬─────┘    └─────┬─────┘
-        ▼                ▼                 ▼
-  CloudWatch       Rollbar API       New Relic API
-  (Logs/Metrics
-   /Alarms)
+└──────────────┘          │
+                ┌─────────┴──────────┐
+                │ Lambda 呼び出し     │ MCP Server プロキシ (API Key)
+                ▼                    ▼
+        ┌───────────────┐    ┌─────────────────────┐
+        │ CloudWatch /  │    │ New Relic 公式 MCP   │
+        │ Rollbar       │    │ mcp.newrelic.com    │
+        │ MCP (Lambda)  │    └──────────┬──────────┘
+        └───────┬───────┘               ▼
+                ▼                   New Relic API
+        CloudWatch Logs /
+        Metrics / Rollbar API
 ```
 
 ## コンポーネント
@@ -67,19 +67,22 @@ Memory Strategy は `SEMANTIC` タイプを使用。イベントの保持期間�
 
 ### AgentCore Gateway
 
-AgentCore Runtime と MCP サーバー（Lambda）の間を中継するマネージドサービス。
+AgentCore Runtime と各種ツールバックエンドの間を中継するマネージドサービス。
 
 - IAM 認証（SigV4）でセキュアに Runtime から呼び出す
-- Lambda を MCP ターゲットとして登録し、ツールを自動検出・同期する
+- ターゲットは2種類:
+  - **Lambda ターゲット**: 自前実装の MCP サーバー Lambda（CloudWatch / Rollbar）
+  - **MCP Server ターゲット**: 外部の MCP サーバーを直接プロキシ（New Relic 公式 MCP）。アウトバウンドは API Key Credential Provider で認証
+- ツールは自動検出・同期する（`listing_mode = DEFAULT` で control plane にキャッシュ）
 - Runtime 側は `mcp-proxy-for-aws` の `aws_iam_streamablehttp_client` で接続
 
-### MCP サーバー群（Lambda, arm64）
+### ツールバックエンド
 
-| Lambda           | 言語       | 主なツール                                             |
-| ---------------- | ---------- | ------------------------------------------------------ |
-| `cloudwatch-mcp` | Python     | CloudWatch Logs/Metrics/Alarms の取得・分析            |
-| `rollbar-mcp`    | TypeScript | エラーアイテム一覧、詳細、デプロイ履歴、ステータス更新 |
-| `newrelic-mcp`   | TypeScript | NRQL クエリ実行、エンティティ検索、アラート取得        |
+| ターゲット       | 種別              | 言語       | 主なツール                                             |
+| ---------------- | ----------------- | ---------- | ------------------------------------------------------ |
+| `cloudwatch-mcp` | Lambda            | Python     | CloudWatch Logs/Metrics/Alarms の取得・分析            |
+| `rollbar-mcp`    | Lambda            | TypeScript | エラーアイテム一覧、詳細、デプロイ履歴、ステータス更新 |
+| `newrelic-mcp`   | MCP Server (公式) | —          | NRQL クエリ実行、エンティティ検索、アラート取得        |
 
 ## データフロー（インシデント調査の例）
 
@@ -111,9 +114,10 @@ AgentCore Runtime と MCP サーバー（Lambda）の間を中継するマネー
 | CloudWatch Log Group          | `bedrock-agentcore-runtime.tf` | Runtime ログ             |
 | AgentCore Memory              | `bedrock-agentcore-memory.tf`  | セマンティック記憶       |
 | AgentCore Gateway             | `bedrock-agentcore-gateway.tf` | MCP Gateway              |
-| ECR + Lambda (cloudwatch-mcp) | `cloudwatch-mcp-server.tf`     | CloudWatch MCP           |
-| ECR + Lambda (rollbar-mcp)    | `rollbar-mcp-server.tf`        | Rollbar MCP              |
-| ECR + Lambda (newrelic-mcp)   | `newrelic-mcp-server.tf`       | New Relic MCP            |
+| ECR + Lambda (cloudwatch-mcp) | `cloudwatch-mcp-server.tf`     | CloudWatch MCP            |
+| ECR + Lambda (rollbar-mcp)    | `rollbar-mcp-server.tf`        | Rollbar MCP               |
+| API Key Credential Provider   | `newrelic-mcp-server.tf`       | New Relic 公式 MCP 認証用 |
+| MCP Server Target (newrelic)  | `bedrock-agentcore-gateway.tf` | New Relic 公式 MCP 接続   |
 
 ## IAM 権限
 
