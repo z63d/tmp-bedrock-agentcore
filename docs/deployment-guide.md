@@ -1,377 +1,108 @@
-# Amazon Bedrock AgentCore + Strands Agents SDK デプロイメントガイド
-
-このドキュメントでは、TypeScriptで作成したStrands AgentをAmazon Bedrock AgentCore Runtimeにデプロイする手順を説明します。
-
-## 目次
-
-1. [概要](#概要)
-2. [前提条件](#前提条件)
-3. [プロジェクト構造](#プロジェクト構造)
-4. [Phase 1: ローカル開発環境のセットアップ](#phase-1-ローカル開発環境のセットアップ)
-5. [Phase 2: AgentCore Runtimeへのデプロイ](#phase-2-agentcore-runtimeへのデプロイ)
-6. [Phase 3: Memory統合](#phase-3-memory統合)
-7. [トラブルシューティング](#トラブルシューティング)
-8. [参考リンク](#参考リンク)
-
----
-
-## 概要
-
-### Amazon Bedrock AgentCore とは
-
-Amazon Bedrock AgentCoreは、AIエージェントを本番環境で安全かつスケーラブルに運用するための新しいプラットフォームです。従来のBedrock Agentsとは異なり、**自分でエージェントコードを書いてコンテナとしてデプロイ**します。
-
-### 従来のBedrock Agents vs AgentCore
-
-| 項目 | 従来のBedrock Agents | AgentCore |
-|------|---------------------|-----------|
-| SDK | `@aws-sdk/client-bedrock-agent-runtime` | `@aws-sdk/client-bedrock-agentcore` |
-| Terraform | `aws_bedrockagent_agent` | `aws_bedrockagentcore_agent_runtime` |
-| API | `InvokeAgent` | `InvokeAgentRuntime` |
-| デプロイ | AWS管理 | **自分でコンテナをデプロイ** |
-| 実行時間 | 短時間 | 最大8時間 |
-| フレームワーク | なし | Strands, LangGraph, CrewAI等 |
-
-### 技術スタック
-
-- **言語**: TypeScript
-- **Agent SDK**: `@strands-agents/sdk`
-- **Runtime SDK**: `bedrock-agentcore`
-- **コンテナ**: Docker (arm64)
-- **インフラ**: Terraform
-- **レジストリ**: Amazon ECR
-
----
+# デプロイガイド
 
 ## 前提条件
 
-### 必要なツール
-
 ```bash
-# Node.js 24以上
-node --version  # v24.x.x
-
-# Docker
-docker --version
-
-# AWS CLI v2
-aws --version
-
-# Terraform 1.14以上
-terraform --version
+python --version   # 3.13 以上（app-py ローカル実行用）
+uv --version       # app-py の依存解決
+node --version     # v22 以上（TS Lambda / CLI 用）
+docker --version   # arm64 ビルド必須
+aws --version      # AWS CLI v2
+terraform --version  # ~1.14
 ```
 
-### AWS認証情報
+AWS 認証:
 
 ```bash
-# AWS SSOでログイン
 aws sso login --profile pn-playground-admin
-
-# 認証情報の確認
 aws sts get-caller-identity --profile pn-playground-admin
 ```
 
-### 必要なAWS権限
-
-- ECR: リポジトリ作成、イメージプッシュ
-- IAM: ロール作成
-- Bedrock AgentCore: Runtime作成、呼び出し
-- Bedrock: モデル呼び出し
-- CloudWatch Logs: ログ確認
-
 ---
 
-## プロジェクト構造
+## デプロイ手順
 
-```
-bedrock-agentcore-ts/
-├── app/
-│   ├── src/
-│   │   ├── agent/
-│   │   │   └── index.ts          # Strands Agent定義
-│   │   └── main.ts               # エントリーポイント
-│   ├── dist/                     # ビルド成果物
-│   ├── Dockerfile
-│   ├── package.json
-│   └── tsconfig.json
-├── terraform/
-│   ├── main.tf                   # ECR + IAM + AgentCore Runtime
-│   ├── variables.tf
-│   └── outputs.tf
-└── docs/
-    └── deployment-guide.md       # このドキュメント
+AgentCore Runtime の作成には ECR にイメージが存在している必要がある。
+そのため **Terraform → イメージ push → Terraform** の順で流す。
+
+### Step 1: Terraform 変数の準備
+
+`terraform/terraform.tfvars` を作成（git 管理外）:
+
+```hcl
+aws_profile          = "pn-playground-admin"
+rollbar_access_token = "xxxxx"
+newrelic_api_key     = "NRAK-xxxxx"
+# newrelic_default_account_id = "1234567"  # 任意
 ```
 
----
-
-## Phase 1: ローカル開発環境のセットアップ
-
-### 1.1 依存関係のインストール
-
-```bash
-cd app
-npm install
-```
-
-**package.json** の主要な依存関係:
-
-```json
-{
-  "dependencies": {
-    "@strands-agents/sdk": "^0.1.5",
-    "bedrock-agentcore": "^0.2.0",
-    "zod": "^4.0.0"
-  }
-}
-```
-
-### 1.2 Strands Agentの定義
-
-**app/src/agent/index.ts**:
-
-```typescript
-import { Agent, BedrockModel, tool } from "@strands-agents/sdk";
-import { z } from "zod";
-
-// カスタムツール: 計算機
-const calculatorSchema = z.object({
-  operation: z
-    .enum(["add", "subtract", "multiply", "divide"])
-    .describe("The mathematical operation to perform"),
-  a: z.number().describe("First number"),
-  b: z.number().describe("Second number"),
-});
-
-const calculator = tool({
-  name: "calculator",
-  description: "Perform mathematical calculations",
-  inputSchema: calculatorSchema,
-  callback: (input) => {
-    switch (input.operation) {
-      case "add":
-        return `Result: ${input.a} + ${input.b} = ${input.a + input.b}`;
-      case "subtract":
-        return `Result: ${input.a} - ${input.b} = ${input.a - input.b}`;
-      case "multiply":
-        return `Result: ${input.a} * ${input.b} = ${input.a * input.b}`;
-      case "divide":
-        return `Result: ${input.a} / ${input.b} = ${input.a / input.b}`;
-    }
-  },
-});
-
-// Agent作成
-export const agent = new Agent({
-  model: new BedrockModel({
-    region: process.env.AWS_REGION ?? "ap-northeast-1",
-    modelId:
-      process.env.BEDROCK_MODEL_ID ?? "anthropic.claude-3-haiku-20240307-v1:0",
-    maxTokens: 4096,
-  }),
-  tools: [calculator],
-  systemPrompt:
-    "You are a helpful assistant. When asked to perform calculations, use the calculator tool.",
-});
-```
-
-### 1.3 BedrockAgentCoreAppの実装
-
-**app/src/main.ts**:
-
-```typescript
-import {
-  BedrockAgentCoreApp,
-  type RequestContext,
-} from "bedrock-agentcore/runtime";
-import { agent } from "./agent/index.js";
-
-const app = new BedrockAgentCoreApp({
-  invocationHandler: {
-    process: async (payload: unknown, context: RequestContext) => {
-      const { prompt } = payload as { prompt: string };
-      console.log(`Session ${context.sessionId} - Received prompt:`, prompt);
-
-      // invoke を使用して非ストリーミングレスポンスを返す
-      const result = await agent.invoke(prompt);
-      return {
-        response: result.toString(),
-        sessionId: context.sessionId,
-      };
-    },
-  },
-});
-
-console.log("Starting AgentCore Runtime server on port 8080...");
-app.run();
-```
-
-**ポイント**:
-- `BedrockAgentCoreApp`はFastifyベースのHTTPサーバー
-- `/ping` (ヘルスチェック) と `/invocations` (エージェント呼び出し) エンドポイントを自動で提供
-- `sessionId`は`x-amzn-bedrock-agentcore-runtime-session-id`ヘッダーから取得
-
-### 1.4 ローカルでの動作確認
-
-```bash
-# ビルド
-npm run build
-
-# 開発サーバー起動 (ローカルテスト用)
-npm run dev
-```
-
-別ターミナルで:
-
-```bash
-# ヘルスチェック
-curl http://localhost:8080/ping
-
-# エージェント呼び出し
-curl -X POST http://localhost:8080/invocations \
-  -H "Content-Type: application/json" \
-  -H "x-amzn-bedrock-agentcore-runtime-session-id: test-session-123456789012345678901234567890" \
-  -d '{"prompt":"What is 5 + 3?"}'
-```
-
----
-
-## Phase 2: AgentCore Runtimeへのデプロイ
-
-### 2.1 デプロイの流れ
-
-AgentCore Runtimeを作成するにはECRイメージが必要なため、以下の順序でデプロイします:
-
-1. **Step 1**: Terraform apply（ECR + IAMのみ作成、AgentCore Runtimeはエラー）
-2. **Step 2**: Dockerイメージをビルド＆ECRにプッシュ
-3. **Step 3**: Terraform apply（AgentCore Runtimeを作成）
-
-### 2.2 Step 1: Terraformの初回実行
+### Step 2: 初回 Terraform apply
 
 ```bash
 cd terraform
-
-# 初期化
 terraform init
-
-# 適用（AgentCore Runtimeはエラーになるが、ECRとIAMは作成される）
 terraform apply
 ```
 
-**注意**: 初回実行時は、ECRにイメージが存在しないためAgentCore Runtimeの作成でエラーが発生します。これは想定通りの動作です。ECRリポジトリとIAMロールは正常に作成されます。
+ECR にイメージが無いため Runtime・Lambda 作成でエラーになるが想定通り。
+ECR リポジトリ・IAM ロール・Memory・Gateway は正常に作成される。
 
-### 2.3 Step 2: Dockerイメージのビルドとプッシュ
-
-#### 2.3.1 Dockerfile
-
-**app/Dockerfile**:
-
-```dockerfile
-FROM node:24-slim
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-COPY dist/ ./dist/
-
-ENV NODE_ENV=production
-
-EXPOSE 8080
-
-CMD ["node", "dist/main.js"]
-```
-
-**重要**:
-- `dotenv`は本番環境では不要なため、`devDependencies`に入れるか、main.tsから`import "dotenv/config"`を削除
-- AgentCore Runtimeは**arm64のみ**サポート
-
-#### 2.3.2 ビルドとプッシュ
+### Step 3: コンテナイメージのビルド & push
 
 ```bash
-cd app
+# エージェント本体
+./scripts/deploy.sh
 
-# TypeScriptビルド
-npm run build
-
-# Dockerイメージビルド (arm64)
-docker build --platform linux/arm64 -t bedrock-agent:latest .
-
-# ECR URLを取得して環境変数に設定（exportで後続のコマンドでも使用可能にする）
-export ECR_URL=$(cd ../terraform && terraform output -raw ecr_repository_url)
-echo "ECR_URL: $ECR_URL"
-
-# ECRログイン
-aws ecr get-login-password --region ap-northeast-1 --profile pn-playground-admin | \
-  docker login --username AWS --password-stdin ${ECR_URL%/*}
-
-# タグ付けとプッシュ
-docker tag bedrock-agent:latest $ECR_URL:latest
-docker push $ECR_URL:latest
+# MCP サーバー（必要なものだけ）
+./scripts/deploy-cloudwatch-mcp.sh
+./scripts/deploy-rollbar-mcp.sh
+./scripts/deploy-newrelic-mcp.sh
 ```
 
-#### 2.3.3 CloudWatch MCP Lambda のビルドとプッシュ（オプション）
+各スクリプトは `terraform output` から ECR URL を取得し、arm64 でビルドして push する。
+MCP サーバー系は Lambda の `update-function-code` まで自動で実行する。
 
-CloudWatch MCP機能を有効にする場合（`enable_cloudwatch_mcp = true`）、Lambda用のDockerイメージもビルド＆プッシュが必要です。
+> スクリプト内の `AWS_PROFILE` は `pn-playground-admin` 固定。別プロファイルなら書き換える。
 
-```bash
-cd lambda/cloudwatch-mcp
-
-# CloudWatch MCP用のECR URLを取得
-export CW_MCP_ECR_URL=$(cd ../../terraform && terraform output -raw cloudwatch_mcp_ecr_repository_url)
-echo "CW_MCP_ECR_URL: $CW_MCP_ECR_URL"
-
-# ECRログイン（まだの場合）
-aws ecr get-login-password --region ap-northeast-1 --profile pn-playground-admin | \
-  docker login --username AWS --password-stdin ${CW_MCP_ECR_URL%/*}
-
-# Dockerイメージビルド (arm64)
-docker build --platform linux/arm64 -t cloudwatch-mcp:latest .
-
-# タグ付けとプッシュ
-docker tag cloudwatch-mcp:latest $CW_MCP_ECR_URL:latest
-docker push $CW_MCP_ECR_URL:latest
-```
-
-### 2.4 Step 3: Terraformの再実行
-
-ECRにイメージがプッシュされたので、再度Terraformを実行してAgentCore Runtimeを作成します:
+### Step 4: Terraform 再 apply
 
 ```bash
 cd terraform
-
-# AgentCore Runtimeを作成
 terraform apply
 ```
 
-これで全てのリソースが正常に作成されます。
+全リソースが揃って Runtime が作成される。
 
-### 2.5 イメージ更新時の手順
+---
 
-コードを変更してイメージを更新した場合:
+## イメージ更新
+
+### エージェント本体 (app-py)
 
 ```bash
-# 1. ビルド＆プッシュ
-cd app
-npm run build
-docker build --platform linux/arm64 -t bedrock-agent:latest .
-docker push $ECR_URL:latest
+./scripts/deploy.sh
+```
 
-# 2. Terraform outputから必要な値を取得
-export RUNTIME_ID=$(cd ../terraform && terraform output -raw agent_runtime_id)
-export ROLE_ARN=$(cd ../terraform && terraform output -raw agentcore_role_arn)
+push 後、Runtime はイメージの変更を自動検知しないため `update-agent-runtime` が必要:
 
-# 3. AgentCore Runtimeを更新（AWS CLIを使用）
+```bash
+cd terraform
+RUNTIME_ID=$(terraform output -raw agent_runtime_id)
+ECR_REPO=$(terraform output -raw ecr_repository_url)
+ROLE_ARN=$(terraform output -raw agentcore_role_arn)
+GATEWAY_ID=$(terraform output -raw gateway_id)
+MEMORY_ID=$(terraform output -raw memory_id)
+
 aws bedrock-agentcore-control update-agent-runtime \
   --agent-runtime-id "$RUNTIME_ID" \
-  --agent-runtime-artifact "{\"containerConfiguration\": {\"containerUri\": \"$ECR_URL:latest\"}}" \
+  --agent-runtime-artifact "{\"containerConfiguration\": {\"containerUri\": \"$ECR_REPO:latest\"}}" \
   --role-arn "$ROLE_ARN" \
   --network-configuration '{"networkMode": "PUBLIC"}' \
-  --environment-variables '{"AWS_REGION": "ap-northeast-1", "BEDROCK_MODEL_ID": "amazon.nova-lite-v1:0"}' \
+  --environment-variables "{\"AWS_REGION\": \"ap-northeast-1\", \"BEDROCK_MODEL_ID\": \"anthropic.claude-3-haiku-20240307-v1:0\", \"MEMORY_ID\": \"$MEMORY_ID\", \"GATEWAY_ID\": \"$GATEWAY_ID\"}" \
   --profile pn-playground-admin \
   --region ap-northeast-1
 
-# 4. ステータスがREADYになるまで待機
+# READY になるまで待機
 aws bedrock-agentcore-control get-agent-runtime \
   --agent-runtime-id "$RUNTIME_ID" \
   --profile pn-playground-admin \
@@ -379,178 +110,75 @@ aws bedrock-agentcore-control get-agent-runtime \
   --query 'status'
 ```
 
-### 2.6 動作確認
-
-#### 2.6.1 Runtimeステータスの確認
+### MCP サーバー（Lambda）
 
 ```bash
-# Runtime IDを取得（まだ設定していない場合）
-export RUNTIME_ID=$(cd terraform && terraform output -raw agent_runtime_id)
-
-aws bedrock-agentcore-control get-agent-runtime \
-  --agent-runtime-id "$RUNTIME_ID" \
-  --profile pn-playground-admin \
-  --region ap-northeast-1 \
-  --query 'status'
+./scripts/deploy-cloudwatch-mcp.sh  # または rollbar / newrelic
 ```
 
-`READY`になるまで待機します。
+Lambda は `update-function-code` で即時反映される。
 
-#### 2.6.2 エージェントの呼び出し
+---
 
-**重要**:
-- `--content-type "application/json"` は必須（デフォルトの`application/octet-stream`では415エラー）
-- `--accept "text/event-stream"` は必須（ストリーミングレスポンスのため、ないと406エラー）
-- `sessionId`はpayload bodyにも含める必要がある（ヘッダーはコンテナに転送されない）
+## CLI の使い方
 
 ```bash
-RUNTIME_ARN=$(cd terraform && terraform output -raw agent_runtime_arn)
-SESSION_ID="test-session-$(date +%s)-abcdefghijklmnop"
-PAYLOAD=$(printf '{"prompt":"Hello", "sessionId":"%s"}' "$SESSION_ID" | base64)
-
-aws bedrock-agentcore invoke-agent-runtime \
-  --agent-runtime-arn "$RUNTIME_ARN" \
-  --payload "$PAYLOAD" \
-  --content-type "application/json" \
-  --accept "text/event-stream" \
-  --runtime-session-id "$SESSION_ID" \
-  --profile pn-playground-admin \
-  --region ap-northeast-1 \
-  response.json
-
-cat response.json
+cd cli
+npm install
+cp .env.example .env
 ```
 
-**期待されるレスポンス** (SSE形式):
-
-```
-event: message
-data: {"text":"Hello! How can I assist you today?","sessionId":"test-session-..."
-}
-```
-
-#### 2.6.3 ツール使用のテスト
+`.env` に `AGENT_RUNTIME_ARN` を設定する:
 
 ```bash
-SESSION_ID="test-calc-$(date +%s)-abcdefghijklmnop"
-PAYLOAD=$(printf '{"prompt":"What is 5 + 3? Use the calculator.", "sessionId":"%s"}' "$SESSION_ID" | base64)
+# 値を取得して .env に追記
+echo "AGENT_RUNTIME_ARN=$(cd ../terraform && terraform output -raw agent_runtime_arn)" >> .env
+```
 
-aws bedrock-agentcore invoke-agent-runtime \
-  --agent-runtime-arn "$RUNTIME_ARN" \
-  --payload "$PAYLOAD" \
-  --content-type "application/json" \
-  --accept "text/event-stream" \
-  --runtime-session-id "$SESSION_ID" \
-  --profile pn-playground-admin \
-  --region ap-northeast-1 \
-  response.json
+| 変数                | 必須 | 説明                      |
+| ------------------- | ---- | ------------------------- |
+| `AGENT_RUNTIME_ARN` | ○    | AgentCore Runtime の ARN  |
+| `AWS_REGION`        |      | 既定 `ap-northeast-1`     |
+| `AWS_PROFILE`       |      | 使用する AWS プロファイル |
 
-cat response.json
+```bash
+# 単発クエリ
+npm run cli -- "過去1時間の CloudWatch アラームを一覧して"
+
+# インタラクティブ（REPL）モード
+npm run cli
+npm run cli -- -i
+
+# セッションを引き継いで再開
+npm run cli -- -s "cli-abc123-1234567890"
 ```
 
 ---
 
-## Phase 3: Memory統合
+## 動作確認
 
-AgentCore Memoryを使用して、エージェントに会話履歴を記憶させます。
-
-### 3.1 Terraformリソースの追加
-
-**terraform/main.tf**に以下を追加:
-
-```hcl
-#------------------------------------------------------------------------------
-# AgentCore Memory
-#------------------------------------------------------------------------------
-
-resource "aws_bedrockagentcore_memory" "main" {
-  name                  = replace(var.project_name, "-", "_")
-  description           = "Memory for ${var.project_name} agent"
-  event_expiry_duration = 30
-}
-
-resource "aws_bedrockagentcore_memory_strategy" "semantic" {
-  name       = "semantic_memory"
-  memory_id  = aws_bedrockagentcore_memory.main.id
-  type       = "SEMANTIC"
-  namespaces = ["/strategies/{memoryStrategyId}/actors/{actorId}/"]
-}
-```
-
-IAMロールにMemory権限を追加:
-
-```hcl
-{
-  Sid    = "AgentCoreMemory"
-  Effect = "Allow"
-  Action = [
-    "bedrock-agentcore:CreateSession",
-    "bedrock-agentcore:GetSession",
-    "bedrock-agentcore:ListSessions",
-    "bedrock-agentcore:DeleteSession",
-    "bedrock-agentcore:CreateEvent",
-    "bedrock-agentcore:ListEvents",
-    "bedrock-agentcore:RetrieveMemoryRecords",
-    "bedrock-agentcore:IngestMemoryRecords",
-    "bedrock-agentcore:ListMemoryRecords"
-  ]
-  Resource = "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:memory/*"
-}
-```
-
-Runtime環境変数に`MEMORY_ID`を追加:
-
-```hcl
-environment_variables = {
-  AWS_REGION       = var.aws_region
-  BEDROCK_MODEL_ID = "amazon.nova-lite-v1:0"
-  MEMORY_ID        = aws_bedrockagentcore_memory.main.id
-}
-```
-
-### 3.2 Memory動作確認
-
-同じセッションIDで複数回リクエストを送信し、会話が記憶されているか確認します。
+### Runtime ステータス確認
 
 ```bash
-RUNTIME_ARN=$(cd terraform && terraform output -raw agent_runtime_arn)
-SESSION_ID="memory-test-$(date +%s)-abcdefghijklmnop"
+cd terraform
+RUNTIME_ID=$(terraform output -raw agent_runtime_id)
 
-# 1回目: 名前を伝える
-PAYLOAD=$(printf '{"prompt":"Hello, my name is Kaita.", "sessionId":"%s"}' "$SESSION_ID" | base64)
-aws bedrock-agentcore invoke-agent-runtime \
-  --agent-runtime-arn "$RUNTIME_ARN" \
-  --payload "$PAYLOAD" \
-  --content-type "application/json" \
-  --accept "text/event-stream" \
-  --runtime-session-id "$SESSION_ID" \
+aws bedrock-agentcore-control get-agent-runtime \
+  --agent-runtime-id "$RUNTIME_ID" \
   --profile pn-playground-admin \
   --region ap-northeast-1 \
-  response.json
-
-cat response.json
-# => "Hi Kaita! ..."
-
-# 2回目: 同じセッションで名前を尋ねる
-PAYLOAD=$(printf '{"prompt":"What is my name?", "sessionId":"%s"}' "$SESSION_ID" | base64)
-aws bedrock-agentcore invoke-agent-runtime \
-  --agent-runtime-arn "$RUNTIME_ARN" \
-  --payload "$PAYLOAD" \
-  --content-type "application/json" \
-  --accept "text/event-stream" \
-  --runtime-session-id "$SESSION_ID" \
-  --profile pn-playground-admin \
-  --region ap-northeast-1 \
-  response.json
-
-cat response.json
-# => "Your name is Kaita." ← 前の会話を記憶している
+  --query 'status'
 ```
 
-```sh
-❯ RUNTIME_ARN=$(cd terraform && terraform output -raw agent_runtime_arn)
-SESSION_ID="test-session-$(date +%s)-afghikjklmno"
-PAYLOAD=$(printf '{"prompt":"List  CloudWatch alarms using MCP", "sessionId":"%s"}' "$SESSION_ID" | base64)
+`"READY"` になるまで待つ。
+
+### エージェント呼び出し
+
+```bash
+cd terraform
+RUNTIME_ARN=$(terraform output -raw agent_runtime_arn)
+SESSION_ID="test-session-$(date +%s)-abcdefghijklmnop"
+PAYLOAD=$(printf '{"prompt":"Hello", "sessionId":"%s"}' "$SESSION_ID" | base64)
 
 aws bedrock-agentcore invoke-agent-runtime \
   --agent-runtime-arn "$RUNTIME_ARN" \
@@ -563,172 +191,143 @@ aws bedrock-agentcore invoke-agent-runtime \
   response.json && cat response.json
 ```
 
-**注意**: プロンプトに`!`を含めるとzshでエスケープされ400エラーになります。`!`を含まない文字列を使用してください。
+期待レスポンス（SSE 形式）:
+
+```
+event: message
+data: {"text":"Hello! How can I assist you today?","sessionId":"test-session-..."}
+```
+
+### Memory 動作確認
+
+同じ `SESSION_ID` で複数回送信し、前の会話を覚えているか確認する:
+
+```bash
+cd terraform
+RUNTIME_ARN=$(terraform output -raw agent_runtime_arn)
+SESSION_ID="memory-test-$(date +%s)-abcdefghijklmnop"
+
+# 1回目: 名前を伝える
+PAYLOAD=$(printf '{"prompt":"Hello, my name is Kaita.", "sessionId":"%s"}' "$SESSION_ID" | base64)
+aws bedrock-agentcore invoke-agent-runtime \
+  --agent-runtime-arn "$RUNTIME_ARN" \
+  --payload "$PAYLOAD" \
+  --content-type "application/json" \
+  --accept "text/event-stream" \
+  --runtime-session-id "$SESSION_ID" \
+  --profile pn-playground-admin \
+  --region ap-northeast-1 \
+  response.json && cat response.json
+
+# 2回目: 名前を聞く（記憶されていれば正しく答える）
+PAYLOAD=$(printf '{"prompt":"What is my name?", "sessionId":"%s"}' "$SESSION_ID" | base64)
+aws bedrock-agentcore invoke-agent-runtime \
+  --agent-runtime-arn "$RUNTIME_ARN" \
+  --payload "$PAYLOAD" \
+  --content-type "application/json" \
+  --accept "text/event-stream" \
+  --runtime-session-id "$SESSION_ID" \
+  --profile pn-playground-admin \
+  --region ap-northeast-1 \
+  response.json && cat response.json
+```
 
 ---
 
-## トラブルシューティング
+## ローカル開発
 
-### よくあるエラーと解決方法
-
-#### 1. `RuntimeClientError: An error occurred when starting the runtime`
-
-**原因**: コンテナの起動に失敗
-
-**確認方法**:
 ```bash
-export RUNTIME_ID=$(cd terraform && terraform output -raw agent_runtime_id)
+cd app-py
+uv pip install --system -e ".[dev]"
 
-aws logs describe-log-streams \
-  --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT" \
-  --profile pn-playground-admin
+# AWS_REGION / BEDROCK_MODEL_ID 等を設定（.env でも可）
+export AWS_REGION=ap-northeast-1
+export AWS_PROFILE=pn-playground-admin
+
+python -m bedrock_agentcore_app.main
 ```
 
-**解決方法**:
-- Dockerイメージがarm64でビルドされているか確認
-- 環境変数が正しく設定されているか確認
-- IAMロールに必要な権限があるか確認
-
-#### 2. `Received error (415) from runtime`
-
-**原因**: Content-Typeが`application/octet-stream`（デフォルト）になっている
-
-**解決方法**:
-- `--content-type "application/json"` を**必ず**指定する
-- AWS CLIはデフォルトで`application/octet-stream`を使用するが、AgentCore Runtime環境ではカスタムContent-Typeパーサーが正しく機能しない
-- `application/json`を明示的に指定することで回避可能
-
-#### 3. `Received error (400) from runtime`
-
-**原因**: リクエストボディが不正
-
-**確認方法**:
-- payloadのbase64エンコードが正しいか確認
-- JSONにエスケープ文字（`\!`など）が含まれていないか確認
+別ターミナルから:
 
 ```bash
-# payloadの確認
-echo "$PAYLOAD" | base64 -d
+# ヘルスチェック
+curl http://localhost:8080/ping
+
+# 呼び出し（sessionId は 33 文字以上必要）
+curl -X POST http://localhost:8080/invocations \
+  -H 'Content-Type: application/json' \
+  -H 'x-amzn-bedrock-agentcore-runtime-session-id: test-session-123456789012345678901234567890' \
+  -d '{"prompt":"Hello"}'
 ```
 
-**注意**: シェル（特にzsh）では`!`が特殊文字として扱われ、`\!`にエスケープされることがあります。
+Docker でコンテナとして動かす場合:
 
 ```bash
-# 悪い例: zshでは"Hello!"が"Hello\!"になる
-PAYLOAD=$(echo -n '{"prompt": "Hello!"}' | base64)
-echo $PAYLOAD | base64 -d  # => {"prompt": "Hello\!"}  ← 400エラーの原因
+cd app-py
+docker build -t bedrock-agent .
 
-# 良い例: printfを使用
-PAYLOAD=$(printf '{"prompt": "Hello"}' | base64)
-
-# 良い例: !を含まない文字列を使用
-PAYLOAD=$(echo -n '{"prompt": "Hello, how are you?"}' | base64)
-```
-
-#### 4. `Missing sessionId`
-
-**原因**: sessionIdがリクエストに含まれていない
-
-**解決方法**:
-- `--runtime-session-id` オプションを追加（33文字以上必要）
-- **重要**: AgentCoreはsessionIdヘッダーをコンテナに転送しないため、**payloadのbodyにも`sessionId`を含める必要がある**
-
-```bash
-# 正しい例: bodyにsessionIdを含める
-SESSION_ID="test-session-$(date +%s)-abcdefghijklmnop"
-PAYLOAD=$(printf '{"prompt":"Hello", "sessionId":"%s"}' "$SESSION_ID" | base64)
-
-aws bedrock-agentcore invoke-agent-runtime \
-  --agent-runtime-arn "$RUNTIME_ARN" \
-  --runtime-session-id "$SESSION_ID" \
-  --content-type "application/json" \
-  --accept "text/event-stream" \
-  --payload "$PAYLOAD" \
-  response.json
-```
-
-#### 5. `Received error (406) from runtime`
-
-**原因**: `Accept`ヘッダーが設定されていない
-
-**解決方法**:
-- `--accept "text/event-stream"` を追加する
-- エージェントがストリーミングレスポンス（`async function*`）を返す場合は必須
-
-#### 6. `Could not load credentials from any providers`
-
-**原因**: AWS認証情報が見つからない
-
-**確認方法**:
-- IAMロールに`bedrock:InvokeModel`権限があるか確認
-- AgentCore Runtimeの環境変数に`AWS_REGION`が設定されているか確認
-
-#### 6. Terraform初回実行時のAgentCore Runtimeエラー
-
-**原因**: ECRにイメージが存在しない
-
-**解決方法**:
-- これは想定通りの動作です
-- イメージをプッシュした後に`terraform apply`を再実行してください
-
-### CloudWatch Logsの確認
-
-```bash
-# Runtime IDを取得（まだ設定していない場合）
-export RUNTIME_ID=$(cd terraform && terraform output -raw agent_runtime_id)
-
-# ログストリーム一覧
-aws logs describe-log-streams \
-  --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT" \
-  --order-by LastEventTime \
-  --descending \
-  --profile pn-playground-admin
-
-# ログイベント取得
-aws logs filter-log-events \
-  --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT" \
-  --start-time $(($(date +%s) * 1000 - 3600000)) \
-  --profile pn-playground-admin
-```
-
-**注意**: アプリケーションの`console.log`出力はCloudWatch Logsに表示されない場合があります。
-
-AgentCoreのログには主にトレースログ（`response_payload`など）が記録されますが、コンテナ内の`console.log`は表示されないことがあります。これはAgentCoreのログ収集の仕様によるものです。
-
-機能が動作しているかどうかは、実際のレスポンス内容で確認してください。
-
-### ローカルでのデバッグ
-
-```bash
-# AWS認証情報をマウントしてコンテナを起動
 docker run --rm \
   -e AWS_REGION=ap-northeast-1 \
   -e BEDROCK_MODEL_ID=amazon.nova-lite-v1:0 \
   -v ~/.aws:/root/.aws:ro \
   -e AWS_PROFILE=pn-playground-admin \
   -p 8080:8080 \
-  bedrock-agent:latest
-
-# 別ターミナルでテスト
-curl -X POST 'http://localhost:8080/invocations' \
-  -H 'Content-Type: application/json' \
-  -H 'x-amzn-bedrock-agentcore-runtime-session-id: test-session-123456789012345678901234567890' \
-  -d '{"prompt":"Hello"}'
+  bedrock-agent
 ```
 
 ---
 
-## 参考リンク
+## トラブルシューティング
 
-- [Amazon Bedrock AgentCore Documentation](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/what-is-bedrock-agentcore.html)
-- [Strands Agents SDK - TypeScript](https://strandsagents.com/latest/documentation/docs/user-guide/deploy/deploy_to_bedrock_agentcore/typescript/)
-- [bedrock-agentcore-sdk-typescript (GitHub)](https://github.com/aws/bedrock-agentcore-sdk-typescript)
-- [Amazon Bedrock AgentCore Samples (GitHub)](https://github.com/awslabs/amazon-bedrock-agentcore-samples)
+### `Received error (415) from runtime`
 
----
+`--content-type "application/json"` が抜けている。AWS CLI のデフォルトは `application/octet-stream` で Runtime が受け付けない。
 
-## 変更履歴
+### `Received error (406) from runtime`
 
-| 日付 | 変更内容 |
-|------|----------|
-| 2026-03-01 | 初版作成 |
+`--accept "text/event-stream"` が抜けている。エージェントがストリーミングレスポンスを返すため必須。
+
+### `Received error (400) from runtime`
+
+payload の base64 エンコードを確認する:
+
+```bash
+echo "$PAYLOAD" | base64 -d
+```
+
+zsh では `!` が特殊文字として `\!` にエスケープされる。`printf` を使うか `!` を含まない文字列にする。
+
+### `Missing sessionId`
+
+`--runtime-session-id` は 33 文字以上必要。
+また AgentCore は sessionId ヘッダーをコンテナに転送しないため、**payload の body にも `sessionId` を含める**こと。
+
+### `Could not load credentials from any providers`
+
+IAM ロールに `bedrock:InvokeModel` 権限があるか、`AWS_REGION` 環境変数が設定されているか確認する。
+
+### Runtime が起動しない (`RuntimeClientError`)
+
+コンテナのログを確認する:
+
+```bash
+cd terraform
+RUNTIME_ID=$(terraform output -raw agent_runtime_id)
+
+aws logs filter-log-events \
+  --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT" \
+  --start-time $(($(date +%s) * 1000 - 3600000)) \
+  --profile pn-playground-admin \
+  --region ap-northeast-1
+```
+
+よくある原因:
+
+- Docker イメージが arm64 でビルドされていない
+- 環境変数が不足している
+- IAM ロールの権限が足りない
+
+### Terraform 初回実行時の Runtime エラー
+
+ECR にイメージが存在しないため起こる想定通りのエラー。Step 3 でイメージを push してから再度 `terraform apply` する。
+</content>
