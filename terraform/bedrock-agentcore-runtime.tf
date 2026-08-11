@@ -152,9 +152,7 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
     MEMORY_ID        = aws_bedrockagentcore_memory.main.id
     GATEWAY_ID       = aws_bedrockagentcore_gateway.main.gateway_id
-    # Python-specific settings
     PYTHONUNBUFFERED = "1"
-    TEST             = "test-env-1dsdjad"
   }
 
   depends_on = [aws_bedrockagentcore_memory_strategy.semantic]
@@ -163,6 +161,11 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
 #------------------------------------------------------------------------------
 # CloudWatch Logs for AgentCore Runtime
 #------------------------------------------------------------------------------
+
+import {
+  to = aws_cloudwatch_log_group.agentcore_runtime
+  id = "/aws/bedrock-agentcore/runtimes/${aws_bedrockagentcore_agent_runtime.main.agent_runtime_id}-DEFAULT"
+}
 
 resource "aws_cloudwatch_log_group" "agentcore_runtime" {
   name              = "/aws/bedrock-agentcore/runtimes/${aws_bedrockagentcore_agent_runtime.main.agent_runtime_id}-DEFAULT"
