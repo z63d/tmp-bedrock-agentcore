@@ -54,7 +54,6 @@ ECR リポジトリ・IAM ロール・Memory・Gateway は正常に作成され�
 
 # MCP サーバー（Rollbar のみ Lambda）
 ./scripts/deploy-rollbar-mcp.sh
-# CloudWatch は AWS 公式 MCP、New Relic は公式 MCP サーバー経由のため Lambda 不要
 ```
 
 各スクリプトは `terraform output` から ECR URL を取得し、arm64 でビルドして push する。
