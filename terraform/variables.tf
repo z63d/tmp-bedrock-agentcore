@@ -46,3 +46,7 @@ variable "newrelic_api_key" {
   type        = string
   sensitive   = true
 }
+
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+}
