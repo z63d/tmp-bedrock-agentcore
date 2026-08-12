@@ -38,7 +38,6 @@ output "memory_arn" {
   value       = aws_bedrockagentcore_memory.main.arn
 }
 
-
 output "gateway_id" {
   description = "ID of the AgentCore Gateway"
   value       = aws_bedrockagentcore_gateway.main.gateway_id
