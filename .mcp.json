@@ -1,0 +1,13 @@
+{
+	"mcpServers": {
+		"bedrock-agentcore-gateway": {
+			"command": "uvx",
+			"args": [
+				"mcp-proxy-for-aws@1.6.1",
+				"https://k-bedrock-agentcore-{id}.gateway.bedrock-agentcore.ap-northeast-1.amazonaws.com/mcp",
+				"--metadata",
+				"AWS_REGION=ap-northeast-1"
+			]
+		}
+	}
+}
