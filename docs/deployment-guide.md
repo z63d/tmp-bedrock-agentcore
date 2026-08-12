@@ -23,7 +23,7 @@ aws sts get-caller-identity --profile pn-playground-admin
 ## デプロイ手順
 
 AgentCore Runtime の作成には ECR にイメージが存在している必要がある。
-そのため **Terraform → イメージ push → Terraform** の順で流す。
+Rollbar MCP Lambda は ZIP デプロイのため Terraform が直接アップロードする。
 
 ### Step 1: Terraform 変数の準備
 
@@ -35,7 +35,17 @@ rollbar_access_token = "xxxxx"
 newrelic_api_key     = "NRAK-xxxxx"  # Gateway → New Relic 公式 MCP のアウトバウンド認証用
 ```
 
-### Step 2: 初回 Terraform apply
+### Step 2: Rollbar MCP Lambda のビルド
+
+Terraform apply 前に dist を生成しておく必要がある。
+
+```bash
+cd lambda/rollbar-mcp
+npm install
+npm run build
+```
+
+### Step 3: 初回 Terraform apply
 
 ```bash
 cd terraform
@@ -43,32 +53,28 @@ terraform init
 terraform apply
 ```
 
-ECR にイメージが無いため Runtime・Lambda 作成でエラーになるが想定通り。
-ECR リポジトリ・IAM ロール・Memory・Gateway は正常に作成される。
+ECR にイメージが無いため Runtime 作成でエラーになるが想定通り。
+ECR リポジトリ・IAM ロール・Memory・Gateway・Rollbar MCP Lambda は正常に作成される。
 
-### Step 3: コンテナイメージのビルド & push
+### Step 4: コンテナイメージのビルド & push
 
 ```bash
 # エージェント本体
 ./scripts/deploy.sh
-
-# MCP サーバー（Rollbar のみ Lambda）
-./scripts/deploy-rollbar-mcp.sh
 ```
 
-各スクリプトは `terraform output` から ECR URL を取得し、arm64 でビルドして push する。
-MCP サーバー系は Lambda の `update-function-code` まで自動で実行する。
+スクリプトは `terraform output` から ECR URL を取得し、arm64 でビルドして push する。
 
 > スクリプト内の `AWS_PROFILE` は `pn-playground-admin` 固定。別プロファイルなら書き換える。
 
-### Step 4: Terraform 再 apply
+### Step 5: Terraform 再 apply
 
 ```bash
 cd terraform
 terraform apply
 ```
 
-全リソースが揃って Runtime が作成される。
+ECR イメージが揃って Runtime が作成される。
 
 ---
 
@@ -110,10 +116,13 @@ aws bedrock-agentcore-control get-agent-runtime \
 ### MCP サーバー（Lambda）
 
 ```bash
-./scripts/deploy-rollbar-mcp.sh
+cd lambda/rollbar-mcp
+npm run build
+cd ../terraform
+terraform apply
 ```
 
-Lambda は `update-function-code` で即時反映される。
+Terraform が ZIP を再生成して Lambda に自動アップロードする。`source_code_hash` で差分を検知するため、dist に変更があれば自動で反映される。
 
 ---
 

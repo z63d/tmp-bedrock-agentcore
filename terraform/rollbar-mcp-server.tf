@@ -21,17 +21,23 @@ resource "aws_bedrockagentcore_workload_identity" "rollbar_mcp" {
 }
 
 #------------------------------------------------------------------------------
-# ECR Repository for Rollbar MCP Lambda
+# Lambda Deployment Package for Rollbar MCP
 #------------------------------------------------------------------------------
 
-resource "aws_ecr_repository" "rollbar_mcp" {
-  name                 = "${var.project_name}-rollbar-mcp"
-  image_tag_mutability = "MUTABLE"
-  force_delete         = true
-
-  image_scanning_configuration {
-    scan_on_push = false
-  }
+data "archive_file" "rollbar_mcp" {
+  type        = "zip"
+  source_dir  = "${path.module}/../lambda/rollbar-mcp"
+  output_path = "${path.module}/../lambda/rollbar-mcp/rollbar-mcp.zip"
+  excludes = [
+    "tsconfig.json",
+    "package-lock.json",
+    "rollbar-mcp.zip",
+    "config.ts",
+    "handler.ts",
+    "tools",
+    "utils",
+    "types",
+  ]
 }
 
 #------------------------------------------------------------------------------
@@ -117,9 +123,12 @@ resource "aws_lambda_function" "rollbar_mcp" {
   function_name = "${var.project_name}-rollbar-mcp"
   role          = aws_iam_role.rollbar_mcp_lambda.arn
 
-  package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.rollbar_mcp.repository_url}:latest"
-  architectures = ["arm64"]
+  package_type     = "Zip"
+  filename         = data.archive_file.rollbar_mcp.output_path
+  source_code_hash = data.archive_file.rollbar_mcp.output_base64sha256
+  handler          = "dist/handler.handler"
+  runtime          = "nodejs22.x"
+  architectures    = ["arm64"]
 
   memory_size = var.rollbar_mcp_lambda_memory
   timeout     = var.rollbar_mcp_lambda_timeout

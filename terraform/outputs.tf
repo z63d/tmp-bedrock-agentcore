@@ -53,11 +53,6 @@ output "gateway_arn" {
 # Rollbar MCP Server Outputs
 #------------------------------------------------------------------------------
 
-output "rollbar_mcp_ecr_repository_url" {
-  description = "URL of the Rollbar MCP ECR repository"
-  value       = aws_ecr_repository.rollbar_mcp.repository_url
-}
-
 output "rollbar_mcp_lambda_arn" {
   description = "ARN of the Rollbar MCP Lambda function"
   value       = aws_lambda_function.rollbar_mcp.arn

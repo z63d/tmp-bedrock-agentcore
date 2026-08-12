@@ -114,7 +114,7 @@ AgentCore Runtime と各種ツールバックエンドの間を中継するマ�
 | CloudWatch Log Group          | `bedrock-agentcore-runtime.tf` | Runtime ログ             |
 | AgentCore Memory              | `bedrock-agentcore-memory.tf`  | セマンティック記憶       |
 | AgentCore Gateway             | `bedrock-agentcore-gateway.tf` | MCP Gateway              |
-| ECR + Lambda (rollbar-mcp)    | `rollbar-mcp-server.tf`        | Rollbar MCP               |
+| Lambda (rollbar-mcp)          | `rollbar-mcp-server.tf`        | Rollbar MCP               |
 | API Key Credential Provider   | `newrelic-mcp-server.tf`       | New Relic 公式 MCP 認証用 |
 | MCP Server Target (newrelic)  | `bedrock-agentcore-gateway.tf` | New Relic 公式 MCP 接続   |
 | MCP Server Target (aws-mcp)  | `bedrock-agentcore-gateway.tf` | AWS 公式 MCP (CloudWatch 等) |
