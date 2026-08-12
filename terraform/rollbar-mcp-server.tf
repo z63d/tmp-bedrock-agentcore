@@ -127,7 +127,7 @@ resource "aws_lambda_function" "rollbar_mcp" {
   filename         = data.archive_file.rollbar_mcp.output_path
   source_code_hash = data.archive_file.rollbar_mcp.output_base64sha256
   handler          = "dist/handler.handler"
-  runtime          = "nodejs22.x"
+  runtime          = "nodejs24.x"
   architectures    = ["arm64"]
 
   memory_size = var.rollbar_mcp_lambda_memory
