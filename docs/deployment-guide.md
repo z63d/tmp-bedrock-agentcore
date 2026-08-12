@@ -5,7 +5,7 @@
 ```bash
 python --version   # 3.13 以上（app-py ローカル実行用）
 uv --version       # app-py の依存解決
-node --version     # v22 以上（TS Lambda / CLI 用）
+node --version     # v24 以上（TS Lambda / CLI 用）
 docker --version   # arm64 ビルド必須
 aws --version      # AWS CLI v2
 terraform --version  # ~1.14
