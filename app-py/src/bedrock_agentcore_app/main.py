@@ -1,9 +1,9 @@
 """
 Bedrock AgentCore Application Entry Point.
 
-Agent with Memory and MCP Gateway integration.
-- Memory for conversation history storage and retrieval
-- MCP Gateway for external tools (CloudWatch, Rollbar, New Relic, etc.)
+Multi-agent architecture (Agents-as-Tools pattern):
+- Orchestrator agent: routes user requests to specialized sub-agents
+- Investigation agent: SRE tool specialist with MCP Gateway access
 """
 
 from __future__ import annotations
@@ -20,6 +20,8 @@ from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
+
+from bedrock_agentcore_app.prompts import INVESTIGATION_SYSTEM_PROMPT, ORCHESTRATOR_SYSTEM_PROMPT
 
 
 # =============================================================================
@@ -139,53 +141,56 @@ else:
 # Create BedrockAgentCoreApp instance
 app = BedrockAgentCoreApp()
 
-# Create agent (singleton, lazy initialization)
-_agent: Agent | None = None
+# Create agents (singleton, lazy initialization)
+_orchestrator: Agent | None = None
 
 
-def get_agent() -> Agent:
-    """Get or create the Strands Agent (singleton pattern)."""
-    global _agent
+def get_orchestrator() -> Agent:
+    """Get or create the orchestrator Agent (singleton pattern)."""
+    global _orchestrator
 
-    if _agent is not None:
-        return _agent
+    if _orchestrator is not None:
+        return _orchestrator
 
-    logger.info("Creating agent", region=region, model_id=model_id, mcp_enabled=mcp_client is not None)
+    logger.info(
+        "Creating multi-agent system",
+        region=region,
+        model_id=model_id,
+        mcp_enabled=mcp_client is not None,
+    )
 
-    system_prompt = """You are an expert AWS DevOps Engineer and Site Reliability Engineer (SRE) specializing in incident investigation and troubleshooting.
-
-## Your Role
-You help engineers investigate and resolve production incidents by analyzing logs, metrics, errors, and system behavior.
-
-## Investigation Approach
-1. **Gather Context**: Understand the symptoms, timeline, and affected services
-2. **Analyze Data**: Query relevant logs and metrics to identify root causes
-3. **Correlate Events**: Connect errors across services and time ranges
-4. **Provide Actionable Insights**: Suggest specific remediation steps
-
-## Response Guidelines
-- Be concise and focus on actionable findings
-- Prioritize critical errors and anomalies
-- Include relevant timestamps and error counts
-- Suggest next investigation steps when root cause is unclear
-- Use Japanese when responding to Japanese queries"""
-
-    # Build tools list
-    tools: list[Any] = []
+    investigation_tools: list[Any] = []
     if mcp_client:
-        tools.append(mcp_client)
+        investigation_tools.append(mcp_client)
 
-    _agent = Agent(
+    investigation_agent = Agent(
+        name="investigation_agent",
         model=BedrockModel(
             region_name=region,
             model_id=model_id,
             max_tokens=4096,
         ),
-        tools=tools,
-        system_prompt=system_prompt,
+        tools=investigation_tools,
+        system_prompt=INVESTIGATION_SYSTEM_PROMPT,
+        callback_handler=None,
     )
 
-    return _agent
+    _orchestrator = Agent(
+        model=BedrockModel(
+            region_name=region,
+            model_id=model_id,
+            max_tokens=4096,
+        ),
+        tools=[
+            investigation_agent.as_tool(
+                name="investigation_agent",
+                description="SRE investigation specialist. Delegates infrastructure monitoring, log analysis, metric queries, error tracking, and incident investigation tasks. Has access to New Relic, AWS CloudWatch, and Rollbar tools via MCP Gateway.",
+            ),
+        ],
+        system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
+    )
+
+    return _orchestrator
 
 
 # =============================================================================
@@ -226,7 +231,7 @@ async def invoke(payload: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
                 context_prompt = f"[Previous context]\n{memory_context}\n\n[Current question]\n{prompt}"
                 logger.info("Found relevant memories", count=len(memory_texts))
 
-    agent = get_agent()
+    agent = get_orchestrator()
 
     try:
         result = agent(context_prompt)
