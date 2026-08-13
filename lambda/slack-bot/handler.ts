@@ -144,6 +144,11 @@ export async function handler(
 
   // 1st invocation: Slack event
   const httpEvent = event as APIGatewayProxyEventV2;
+
+  if (httpEvent.headers?.["x-slack-retry-num"]) {
+    return { statusCode: 200, body: "ok" };
+  }
+
   const body = httpEvent.isBase64Encoded
     ? Buffer.from(httpEvent.body ?? "", "base64").toString()
     : httpEvent.body ?? "";
