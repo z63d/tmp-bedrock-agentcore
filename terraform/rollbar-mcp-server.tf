@@ -143,3 +143,12 @@ resource "aws_lambda_function" "rollbar_mcp" {
 
   depends_on = [aws_iam_role_policy.rollbar_mcp_lambda]
 }
+
+#------------------------------------------------------------------------------
+# CloudWatch Logs
+#------------------------------------------------------------------------------
+
+resource "aws_cloudwatch_log_group" "rollbar_mcp" {
+  name              = "/aws/lambda/${aws_lambda_function.rollbar_mcp.function_name}"
+  retention_in_days = 3
+}
