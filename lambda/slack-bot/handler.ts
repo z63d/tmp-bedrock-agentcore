@@ -99,17 +99,16 @@ interface AsyncPayload {
   __async: true;
   channel: string;
   threadTs: string;
+  messageTs: string;
   text: string;
 }
 
 async function processAsync(payload: AsyncPayload): Promise<void> {
-  const { channel, threadTs, text } = payload;
+  const { channel, threadTs, messageTs, text } = payload;
 
-  await slack.chat.postMessage({
-    channel,
-    text: ":mag: 調査中です...",
-    thread_ts: threadTs,
-  });
+  if (messageTs === threadTs) {
+    await slack.reactions.add({ channel, timestamp: messageTs, name: "eyes" });
+  }
 
   const sessionId = `slack-${channel}-${threadTs.replace(".", "")}`;
 
@@ -175,7 +174,8 @@ export async function handler(
   }
 
   const channel: string = slackEvent.channel;
-  const threadTs: string = slackEvent.thread_ts ?? slackEvent.ts;
+  const messageTs: string = slackEvent.ts;
+  const threadTs: string = slackEvent.thread_ts ?? messageTs;
   const text = (slackEvent.text as string)
     .replace(/<@[A-Z0-9]+>/g, "")
     .trim();
@@ -198,6 +198,7 @@ export async function handler(
         __async: true,
         channel,
         threadTs,
+        messageTs,
         text,
       } satisfies AsyncPayload),
     })
