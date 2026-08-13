@@ -10,7 +10,7 @@ DOCKER_CONFIG="$REPO_ROOT/.docker-tmp"
 cd "$(dirname "$0")/../terraform"
 ECR_REPO=$(terraform output -raw ecr_repository_url)
 
-cd ../app-py
+cd ../app/bedrock-agentcore-sre
 
 # Docker build
 echo "Building Docker image..."

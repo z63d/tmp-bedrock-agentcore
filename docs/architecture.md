@@ -8,7 +8,7 @@
       ▼
 ┌─────────────────────────────────────────┐
 │  AgentCore Runtime (ECS/Fargate, arm64)  │
-│  app-py — Python 3.13 / Strands Agents   │
+│  bedrock-agentcore-sre — Python 3.13 / Strands Agents │
 │                                          │
 │  BedrockModel (claude-3-haiku 等)        │
 │  MCPClient → Gateway                    │
@@ -36,7 +36,7 @@
 
 ## コンポーネント
 
-### AgentCore Runtime (`app-py/`)
+### AgentCore Runtime (`app/bedrock-agentcore-sre/`)
 
 **役割**: ユーザーリクエストを受け取り、Strands Agent が Bedrock モデルと MCP ツールを使って回答する。
 

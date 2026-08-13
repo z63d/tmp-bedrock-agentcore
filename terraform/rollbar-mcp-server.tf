@@ -26,8 +26,8 @@ resource "aws_bedrockagentcore_workload_identity" "rollbar_mcp" {
 
 data "archive_file" "rollbar_mcp" {
   type        = "zip"
-  source_dir  = "${path.module}/../lambda/rollbar-mcp"
-  output_path = "${path.module}/../lambda/rollbar-mcp/rollbar-mcp.zip"
+  source_dir  = "${path.module}/../app/lambda-rollbar-mcp"
+  output_path = "${path.module}/../app/lambda-rollbar-mcp/rollbar-mcp.zip"
   excludes = [
     "tsconfig.json",
     "package-lock.json",

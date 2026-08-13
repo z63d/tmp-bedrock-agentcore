@@ -10,18 +10,19 @@ AgentCore Memory（会話履歴のセマンティック検索）と AgentCore Ga
 
 | ディレクトリ             | 内容                                                            |
 | ------------------------ | --------------------------------------------------------------- |
-| `app-py/`                | **現行**の AgentCore Runtime アプリ（Python / Strands Agents）  |
-| `cli/`                   | Runtime を呼び出す CLI ツール（TypeScript）                     |
-| `lambda/rollbar-mcp/`    | Rollbar MCP サーバー（TypeScript, Lambda）                      |
-| `terraform/`             | インフラ定義（ECR / IAM / Runtime / Memory / Gateway / Lambda） |
-| `scripts/`               | ビルド & デプロイスクリプト                                     |
-| `docs/`                  | 設計・デプロイ・API リファレンス                                |
+| `app/bedrock-agentcore-sre/` | AgentCore Runtime アプリ（Python / Strands Agents）             |
+| `app/lambda-rollbar-mcp/`   | Rollbar MCP サーバー（TypeScript, Lambda）                      |
+| `app/lambda-slack-bot/`     | Slack Bot（TypeScript, Lambda）                                 |
+| `cli/`                      | Runtime を呼び出す CLI ツール（TypeScript）                     |
+| `terraform/`                | インフラ定義（ECR / IAM / Runtime / Memory / Gateway / Lambda） |
+| `scripts/`                  | ビルド & デプロイスクリプト                                     |
+| `docs/`                     | 設計・デプロイ・API リファレンス                                |
 
 ## クイックスタート
 
 ```bash
 # 1. Rollbar MCP Lambda をビルド
-cd lambda/rollbar-mcp && npm install && npm run build
+cd app/lambda-rollbar-mcp && npm install && npm run build
 
 # 2. Terraform で AWS リソースを作成（Runtime 以外）
 cd terraform && terraform init && terraform apply

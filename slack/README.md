@@ -48,7 +48,7 @@ slack_signing_secret = "xxxxx"
 
 ```bash
 # ビルド
-cd lambda/slack-bot
+cd app/lambda-slack-bot
 npm install
 npm run build
 
@@ -93,7 +93,7 @@ terraform output slack_bot_function_url
 ## Lambda の更新
 
 ```bash
-cd lambda/slack-bot
+cd app/lambda-slack-bot
 npm run build
 cd ../../terraform && terraform apply
 ```
