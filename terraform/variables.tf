@@ -1,3 +1,7 @@
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+}
+
 variable "aws_region" {
   description = "AWS region"
   type        = string
@@ -47,6 +51,30 @@ variable "newrelic_api_key" {
   sensitive   = true
 }
 
-locals {
-  account_id = data.aws_caller_identity.current.account_id
+#------------------------------------------------------------------------------
+# Slack Bot Variables
+#------------------------------------------------------------------------------
+
+variable "slack_bot_token" {
+  description = "Slack Bot User OAuth Token (xoxb-xxxxx)"
+  type        = string
+  sensitive   = true
+}
+
+variable "slack_signing_secret" {
+  description = "Slack App Signing Secret"
+  type        = string
+  sensitive   = true
+}
+
+variable "slack_bot_lambda_memory" {
+  description = "Memory size for Slack Bot Lambda in MB"
+  type        = number
+  default     = 256
+}
+
+variable "slack_bot_lambda_timeout" {
+  description = "Timeout for Slack Bot Lambda in seconds"
+  type        = number
+  default     = 120
 }

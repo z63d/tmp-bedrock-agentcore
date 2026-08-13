@@ -1,0 +1,26 @@
+{
+  "name": "slack-bot-lambda",
+  "version": "1.0.0",
+  "description": "Slack Bot Lambda — bridges Slack mentions to Bedrock AgentCore Runtime",
+  "type": "module",
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@slack/web-api": "^7.9.0",
+    "@aws-sdk/client-bedrock-agentcore": "^3.1004.0",
+    "@aws-sdk/client-secrets-manager": "^3.1004.0",
+    "@aws-sdk/client-lambda": "^3.1004.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.149",
+    "@types/node": "^24.13.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

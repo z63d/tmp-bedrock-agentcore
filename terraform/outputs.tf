@@ -56,3 +56,17 @@ output "rollbar_mcp_lambda_arn" {
   description = "ARN of the Rollbar MCP Lambda function"
   value       = aws_lambda_function.rollbar_mcp.arn
 }
+
+#------------------------------------------------------------------------------
+# Slack Bot Outputs
+#------------------------------------------------------------------------------
+
+output "slack_bot_function_url" {
+  description = "Function URL of the Slack Bot Lambda"
+  value       = aws_lambda_function_url.slack_bot.function_url
+}
+
+output "slack_bot_lambda_arn" {
+  description = "ARN of the Slack Bot Lambda function"
+  value       = aws_lambda_function.slack_bot.arn
+}

@@ -23,7 +23,7 @@ aws sts get-caller-identity --profile pn-playground-admin
 ## デプロイ手順
 
 AgentCore Runtime の作成には ECR にイメージが存在している必要がある。
-Rollbar MCP Lambda は ZIP デプロイのため Terraform が直接アップロードする。
+Rollbar MCP Lambda・Slack Bot Lambda は ZIP デプロイのため Terraform が直接アップロードする。
 
 ### Step 1: Terraform 変数の準備
 
@@ -33,14 +33,22 @@ Rollbar MCP Lambda は ZIP デプロイのため Terraform が直接アップロ
 aws_profile          = "pn-playground-admin"
 rollbar_access_token = "xxxxx"
 newrelic_api_key     = "NRAK-xxxxx"  # Gateway → New Relic 公式 MCP のアウトバウンド認証用
+slack_bot_token      = "xoxb-xxxxx"  # Slack Bot User OAuth Token
+slack_signing_secret = "xxxxx"       # Slack App Signing Secret
 ```
 
-### Step 2: Rollbar MCP Lambda のビルド
+### Step 2: Lambda のビルド
 
-Terraform apply 前に dist を生成しておく必要がある。
+Terraform apply 前にビルド成果物を生成しておく必要がある。
 
 ```bash
+# Rollbar MCP Lambda (TypeScript)
 cd lambda/rollbar-mcp
+npm install
+npm run build
+
+# Slack Bot Lambda (TypeScript)
+cd lambda/slack-bot
 npm install
 npm run build
 ```
@@ -54,7 +62,7 @@ terraform apply
 ```
 
 ECR にイメージが無いため Runtime 作成でエラーになるが想定通り。
-ECR リポジトリ・IAM ロール・Memory・Gateway・Rollbar MCP Lambda は正常に作成される。
+ECR リポジトリ・IAM ロール・Memory・Gateway・Lambda 群は正常に作成される。
 
 ### Step 4: コンテナイメージのビルド & push
 
@@ -75,6 +83,27 @@ terraform apply
 ```
 
 ECR イメージが揃って Runtime が作成される。
+
+### Step 6: Slack App の設定
+
+1. Terraform の出力から Function URL を取得:
+
+```bash
+cd terraform
+terraform output slack_bot_function_url
+```
+
+2. [api.slack.com](https://api.slack.com/apps) で Slack App を作成・設定:
+   - **OAuth & Permissions** → Bot Token Scopes: `app_mentions:read`, `chat:write`
+   - **Event Subscriptions** → Enable Events → Request URL に Function URL を設定
+   - **Event Subscriptions** → Subscribe to bot events: `app_mention`
+   - ワークスペースにインストール
+
+3. 動作確認: Slack チャンネルでボットをメンションして質問する
+
+```
+@bot 過去1時間の CloudWatch アラームを一覧して
+```
 
 ---
 
@@ -113,16 +142,27 @@ aws bedrock-agentcore-control get-agent-runtime \
   --query 'status'
 ```
 
-### MCP サーバー（Lambda）
+### Rollbar MCP Lambda
 
 ```bash
 cd lambda/rollbar-mcp
 npm run build
-cd ../terraform
+cd ../../terraform
 terraform apply
 ```
 
 Terraform が ZIP を再生成して Lambda に自動アップロードする。`source_code_hash` で差分を検知するため、dist に変更があれば自動で反映される。
+
+### Slack Bot Lambda
+
+```bash
+cd lambda/slack-bot
+npm run build
+cd ../../terraform
+terraform apply
+```
+
+Rollbar MCP と同じく `archive_file` で dist の変更を検知して自動アップロードする。
 
 ---
 
@@ -335,5 +375,22 @@ aws logs filter-log-events \
 
 ### Terraform 初回実行時の Runtime エラー
 
-ECR にイメージが存在しないため起こる想定通りのエラー。Step 3 でイメージを push してから再度 `terraform apply` する。
-</content>
+ECR にイメージが存在しないため起こる想定通りのエラー。Step 4 でイメージを push してから再度 `terraform apply` する。
+
+### Slack Bot が応答しない
+
+1. Lambda のログを確認:
+
+```bash
+aws logs filter-log-events \
+  --log-group-name "/aws/lambda/k-bedrock-agentcore-slack-bot" \
+  --start-time $(($(date +%s) * 1000 - 600000)) \
+  --profile pn-playground-admin \
+  --region ap-northeast-1
+```
+
+2. よくある原因:
+   - `SLACK_BOT_TOKEN` / `SLACK_SIGNING_SECRET` が間違っている
+   - Slack App の Event Subscriptions Request URL が正しく設定されていない
+   - Bot Token Scopes に `app_mentions:read` / `chat:write` が不足
+   - Lambda のタイムアウト（デフォルト 120 秒）が短い場合は `slack_bot_lambda_timeout` を増やす
