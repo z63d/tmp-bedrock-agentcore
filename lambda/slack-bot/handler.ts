@@ -8,7 +8,7 @@ import {
 } from "@aws-sdk/client-secrets-manager";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { WebClient } from "@slack/web-api";
-import { createHmac, timingSafeEqual, randomUUID } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import type { APIGatewayProxyEventV2, Context } from "aws-lambda";
 
 const region = process.env.AWS_REGION ?? "ap-northeast-1";
@@ -111,7 +111,7 @@ async function processAsync(payload: AsyncPayload): Promise<void> {
     thread_ts: threadTs,
   });
 
-  const sessionId = `slack-${channel}-${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  const sessionId = `slack-${channel}-${threadTs.replace(".", "")}`;
 
   try {
     const result = await invokeAgent(text, sessionId);
