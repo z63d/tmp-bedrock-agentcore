@@ -135,7 +135,12 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
   }
 
   network_configuration {
-    network_mode = "PUBLIC"
+    network_mode = "VPC"
+
+    network_mode_config {
+      subnets         = [aws_subnet.private.id]
+      security_groups = [aws_security_group.agentcore_runtime.id]
+    }
   }
 
   environment_variables = {
