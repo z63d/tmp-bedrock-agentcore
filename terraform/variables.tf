@@ -67,6 +67,18 @@ variable "slack_signing_secret" {
   sensitive   = true
 }
 
+variable "allowed_slack_channel_ids" {
+  description = "Slack channel IDs allowed to use the bot. Empty = all channels allowed."
+  type        = list(string)
+  default     = []
+}
+
+variable "allowed_slack_user_ids" {
+  description = "Slack user IDs allowed to use the bot. Empty = all users allowed."
+  type        = list(string)
+  default     = []
+}
+
 variable "slack_bot_lambda_memory" {
   description = "Memory size for Slack Bot Lambda in MB"
   type        = number

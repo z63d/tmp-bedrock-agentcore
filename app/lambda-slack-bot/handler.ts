@@ -15,6 +15,13 @@ const region = process.env.AWS_REGION ?? "ap-northeast-1";
 const runtimeArn = process.env.AGENT_RUNTIME_ARN!;
 const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME!;
 
+const allowedSlackChannels = new Set(
+  (process.env.ALLOWED_SLACK_CHANNEL_IDS ?? "").split(",").filter(Boolean)
+);
+const allowedSlackUsers = new Set(
+  (process.env.ALLOWED_SLACK_USER_IDS ?? "").split(",").filter(Boolean)
+);
+
 const secretsClient = new SecretsManagerClient({ region });
 const agentCoreClient = new BedrockAgentCoreClient({ region });
 const lambdaClient = new LambdaClient({ region });
@@ -179,6 +186,15 @@ export async function handler(
   }
 
   const channel: string = slackEvent.channel;
+  const userId: string = slackEvent.user;
+
+  if (allowedSlackChannels.size > 0 && !allowedSlackChannels.has(channel)) {
+    return { statusCode: 200, body: "ok" };
+  }
+  if (allowedSlackUsers.size > 0 && !allowedSlackUsers.has(userId)) {
+    return { statusCode: 200, body: "ok" };
+  }
+
   const messageTs: string = slackEvent.ts;
   const threadTs: string = slackEvent.thread_ts ?? messageTs;
   const text = (slackEvent.text as string)

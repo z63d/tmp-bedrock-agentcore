@@ -135,6 +135,8 @@ resource "aws_lambda_function" "slack_bot" {
       SLACK_SIGNING_SECRET_SECRET_ARN = aws_secretsmanager_secret.slack_signing_secret.arn
       AGENT_RUNTIME_ARN               = aws_bedrockagentcore_agent_runtime.main.agent_runtime_arn
       AWS_REGION_NAME                 = var.aws_region
+      ALLOWED_SLACK_CHANNEL_IDS       = join(",", var.allowed_slack_channel_ids)
+      ALLOWED_SLACK_USER_IDS          = join(",", var.allowed_slack_user_ids)
     }
   }
 
