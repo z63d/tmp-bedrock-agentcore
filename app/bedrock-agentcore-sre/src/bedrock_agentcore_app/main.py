@@ -111,6 +111,7 @@ model_id = os.environ["BEDROCK_MODEL_ID"]
 memory_id = os.environ.get("MEMORY_ID")
 gateway_id = os.environ.get("GATEWAY_ID")
 eks_cluster_name = os.environ.get("EKS_CLUSTER_NAME")
+mysql_host = os.environ.get("MYSQL_HOST")
 
 # Initialize Memory Client (optional)
 memory_client: MemoryClient | None = None
@@ -170,6 +171,12 @@ def get_orchestrator() -> Agent:
         investigation_tools.extend(k8s_tools)
         logger.info("K8s tools enabled", cluster=eks_cluster_name)
 
+    if mysql_host:
+        from bedrock_agentcore_app.tools.mysql import mysql_tools
+
+        investigation_tools.extend(mysql_tools)
+        logger.info("MySQL tools enabled", host=mysql_host)
+
     investigation_agent = Agent(
         name="investigation_agent",
         model=BedrockModel(
@@ -191,7 +198,7 @@ def get_orchestrator() -> Agent:
         tools=[
             investigation_agent.as_tool(
                 name="investigation_agent",
-                description="SRE investigation specialist. Delegates infrastructure monitoring, log analysis, metric queries, error tracking, Kubernetes cluster inspection, and incident investigation tasks. Has access to New Relic, AWS CloudWatch, Rollbar tools via MCP Gateway, and Kubernetes tools for EKS.",
+                description="SRE investigation specialist. Delegates infrastructure monitoring, log analysis, metric queries, error tracking, Kubernetes cluster inspection, MySQL database queries, and incident investigation tasks. Has access to New Relic, AWS CloudWatch, Rollbar tools via MCP Gateway, Kubernetes tools for EKS, and MySQL read-only query tools.",
             ),
         ],
         system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,

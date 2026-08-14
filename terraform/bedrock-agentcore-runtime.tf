@@ -124,6 +124,14 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
         ]
         Resource = "arn:aws:eks:${var.aws_region}:${local.account_id}:cluster/*"
       },
+      {
+        Sid    = "RDSSecretAccess"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!*"
+      },
     ]
   })
 }
@@ -157,6 +165,9 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     MEMORY_ID        = aws_bedrockagentcore_memory.main.id
     GATEWAY_ID       = aws_bedrockagentcore_gateway.main.gateway_id
     EKS_CLUSTER_NAME = var.eks_cluster_name
+    MYSQL_HOST       = var.mysql_host
+    MYSQL_SECRET_ARN = var.mysql_secret_arn
+    MYSQL_DATABASE   = var.mysql_database
     PYTHONUNBUFFERED = "1"
   }
 
