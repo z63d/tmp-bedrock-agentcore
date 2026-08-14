@@ -34,6 +34,10 @@ resource "aws_eks_cluster" "main" {
     endpoint_public_access  = true
   }
 
+  access_config {
+    authentication_mode = "API"
+  }
+
   depends_on = [aws_iam_role_policy_attachment.eks_cluster]
 }
 
@@ -84,4 +88,24 @@ resource "aws_eks_node_group" "main" {
   }
 
   depends_on = [aws_iam_role_policy_attachment.eks_nodes]
+}
+
+#------------------------------------------------------------------------------
+# EKS Access Entries
+#------------------------------------------------------------------------------
+
+# Admin (SSO role)
+resource "aws_eks_access_entry" "admin" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = var.admin_role_arn
+}
+
+resource "aws_eks_access_policy_association" "admin" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = var.admin_role_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
 }

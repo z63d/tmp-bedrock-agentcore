@@ -14,3 +14,13 @@ variable "project_name" {
   type        = string
   default     = "product-workload"
 }
+
+variable "admin_role_arn" {
+  description = "ARN of the IAM role for EKS cluster admin access"
+  type        = string
+}
+
+variable "agentcore_runtime_role_arn" {
+  description = "ARN of the AgentCore Runtime IAM role (for EKS read-only access)"
+  type        = string
+}
