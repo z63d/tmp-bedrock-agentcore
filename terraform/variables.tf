@@ -19,6 +19,12 @@ variable "project_name" {
   default     = "k-bedrock-agentcore"
 }
 
+variable "eks_cluster_name" {
+  description = "EKS cluster name for K8s tools (empty = disabled)"
+  type        = string
+  default     = "product-workload"
+}
+
 #------------------------------------------------------------------------------
 # Rollbar MCP Server Variables
 #------------------------------------------------------------------------------

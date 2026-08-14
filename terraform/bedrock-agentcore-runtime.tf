@@ -116,6 +116,14 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
         ]
         Resource = aws_bedrockagentcore_gateway.main.gateway_arn
       },
+      {
+        Sid    = "EKSDescribeCluster"
+        Effect = "Allow"
+        Action = [
+          "eks:DescribeCluster"
+        ]
+        Resource = "arn:aws:eks:${var.aws_region}:${local.account_id}:cluster/*"
+      },
     ]
   })
 }
@@ -148,6 +156,7 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     BEDROCK_MODEL_ID = "jp.anthropic.claude-haiku-4-5-20251001-v1:0"
     MEMORY_ID        = aws_bedrockagentcore_memory.main.id
     GATEWAY_ID       = aws_bedrockagentcore_gateway.main.gateway_id
+    EKS_CLUSTER_NAME = var.eks_cluster_name
     PYTHONUNBUFFERED = "1"
   }
 

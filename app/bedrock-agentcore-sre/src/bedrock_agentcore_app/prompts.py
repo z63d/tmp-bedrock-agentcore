@@ -43,12 +43,27 @@ Use `name_pattern` with wildcards: '%dbt%' (contains), 'prod%' (starts with), '%
 - リージョンは必ず `--region ap-northeast-1` を指定すること
 - 例: `aws cloudwatch describe-alarms --state-value ALARM --region ap-northeast-1`
 - 例: `aws logs start-query --log-group-name /aws/lambda/my-func --query-string 'fields @timestamp, @message | filter @message like /ERROR/' --start-time 1234567890 --end-time 1234567899 --region ap-northeast-1`
-- CloudWatch、ECS、EC2、RDS など任意の AWS サービスの読み取り操作が可能"""
+- CloudWatch、ECS、EC2、RDS など任意の AWS サービスの読み取り操作が可能
+
+## Kubernetes ツールの使い方
+EKS クラスターに直接アクセスして read-only 操作が可能。
+
+### 調査フロー
+1. `k8s_get_deployments` で Deployment の状態を確認（replicas, ready, image）
+2. `k8s_get_pods` で Pod の状態を確認（status, restarts）
+3. 問題のある Pod は `k8s_describe_pod` で詳細を確認（conditions, container states）
+4. `k8s_get_pod_logs` でログを取得
+5. `k8s_get_events` でスケジューリングや起動の問題を調査
+
+### Tips
+- namespace を空にすると全 namespace を対象に検索する
+- restart が多い Pod は CrashLoopBackOff の可能性がある — logs と events を確認
+- Pod が Pending のまま進まない場合は events でスケジューリング失敗の原因を確認"""
 
 ORCHESTRATOR_SYSTEM_PROMPT = """You are an orchestrator agent that routes user requests to specialized sub-agents and presents the results.
 
 ## Available Sub-Agents
-- **investigation_agent**: SRE specialist with access to New Relic, AWS CloudWatch, and Rollbar tools. Use for any infrastructure investigation, monitoring, log analysis, metric queries, error tracking, or incident investigation tasks.
+- **investigation_agent**: SRE specialist with access to New Relic, AWS CloudWatch, Rollbar, and Kubernetes (EKS) tools. Use for any infrastructure investigation, monitoring, log analysis, metric queries, error tracking, Kubernetes cluster inspection, or incident investigation tasks.
 
 ## Routing Rules
 - Infrastructure/monitoring/incident investigation → investigation_agent

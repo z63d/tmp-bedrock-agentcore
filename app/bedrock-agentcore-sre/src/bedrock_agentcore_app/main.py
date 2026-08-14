@@ -110,6 +110,7 @@ region = os.environ.get("AWS_REGION", "ap-northeast-1")
 model_id = os.environ["BEDROCK_MODEL_ID"]
 memory_id = os.environ.get("MEMORY_ID")
 gateway_id = os.environ.get("GATEWAY_ID")
+eks_cluster_name = os.environ.get("EKS_CLUSTER_NAME")
 
 # Initialize Memory Client (optional)
 memory_client: MemoryClient | None = None
@@ -163,6 +164,12 @@ def get_orchestrator() -> Agent:
     if mcp_client:
         investigation_tools.append(mcp_client)
 
+    if eks_cluster_name:
+        from bedrock_agentcore_app.tools.k8s import k8s_tools
+
+        investigation_tools.extend(k8s_tools)
+        logger.info("K8s tools enabled", cluster=eks_cluster_name)
+
     investigation_agent = Agent(
         name="investigation_agent",
         model=BedrockModel(
@@ -184,7 +191,7 @@ def get_orchestrator() -> Agent:
         tools=[
             investigation_agent.as_tool(
                 name="investigation_agent",
-                description="SRE investigation specialist. Delegates infrastructure monitoring, log analysis, metric queries, error tracking, and incident investigation tasks. Has access to New Relic, AWS CloudWatch, and Rollbar tools via MCP Gateway.",
+                description="SRE investigation specialist. Delegates infrastructure monitoring, log analysis, metric queries, error tracking, Kubernetes cluster inspection, and incident investigation tasks. Has access to New Relic, AWS CloudWatch, Rollbar tools via MCP Gateway, and Kubernetes tools for EKS.",
             ),
         ],
         system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
