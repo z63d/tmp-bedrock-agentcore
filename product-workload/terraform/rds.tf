@@ -19,7 +19,7 @@ resource "aws_security_group" "rds" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = [local.vpc_cidr]
+    cidr_blocks = [local.vpc_cidr, var.agentcore_vpc_cidr]
   }
 
   lifecycle {

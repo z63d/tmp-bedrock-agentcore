@@ -15,6 +15,12 @@ variable "project_name" {
   default     = "product-workload"
 }
 
+variable "agentcore_vpc_cidr" {
+  description = "CIDR block of the AgentCore VPC (for RDS SG ingress)"
+  type        = string
+  default     = "10.1.0.0/16"
+}
+
 variable "admin_role_arn" {
   description = "ARN of the IAM role for EKS cluster admin access"
   type        = string
