@@ -1,25 +1,5 @@
 # デプロイガイド
 
-## 前提条件
-
-```bash
-python --version   # 3.13 以上（bedrock-agentcore-sre ローカル実行用）
-uv --version       # bedrock-agentcore-sre の依存解決
-node --version     # v24 以上（TS Lambda / CLI 用）
-docker --version   # arm64 ビルド必須
-aws --version      # AWS CLI v2
-terraform --version  # ~1.14
-```
-
-AWS 認証:
-
-```bash
-aws sso login --profile pn-playground-admin
-aws sts get-caller-identity --profile pn-playground-admin
-```
-
----
-
 ## デプロイ手順
 
 AgentCore Runtime の作成には ECR にイメージが存在している必要がある。
@@ -28,14 +8,6 @@ Rollbar MCP Lambda・Slack Bot Lambda は ZIP デプロイのため Terraform �
 ### Step 1: Terraform 変数の準備
 
 `terraform/terraform.tfvars` を作成（git 管理外）:
-
-```hcl
-aws_profile          = "pn-playground-admin"
-rollbar_access_token = "xxxxx"
-newrelic_api_key     = "NRAK-xxxxx"  # Gateway → New Relic 公式 MCP のアウトバウンド認証用
-slack_bot_token      = "xoxb-xxxxx"  # Slack Bot User OAuth Token
-slack_signing_secret = "xxxxx"       # Slack App Signing Secret
-```
 
 ### Step 2: Lambda のビルド
 
@@ -122,25 +94,13 @@ cd terraform
 RUNTIME_ID=$(terraform output -raw agent_runtime_id)
 ECR_REPO=$(terraform output -raw ecr_repository_url)
 ROLE_ARN=$(terraform output -raw agentcore_role_arn)
-GATEWAY_ID=$(terraform output -raw gateway_id)
-MEMORY_ID=$(terraform output -raw memory_id)
 
 aws bedrock-agentcore-control update-agent-runtime \
   --agent-runtime-id "$RUNTIME_ID" \
   --agent-runtime-artifact "{\"containerConfiguration\": {\"containerUri\": \"$ECR_REPO:latest\"}}" \
   --role-arn "$ROLE_ARN" \
-  --network-configuration '{"networkMode": "PUBLIC"}' \
-  --environment-variables "{\"AWS_REGION\": \"ap-northeast-1\", \"BEDROCK_MODEL_ID\": \"anthropic.claude-3-haiku-20240307-v1:0\", \"MEMORY_ID\": \"$MEMORY_ID\", \"GATEWAY_ID\": \"$GATEWAY_ID\"}" \
   --profile pn-playground-admin \
   --region ap-northeast-1
-
-# READY になるまで待機
-aws bedrock-agentcore-control get-agent-runtime \
-  --agent-runtime-id "$RUNTIME_ID" \
-  --profile pn-playground-admin \
-  --region ap-northeast-1 \
-  --query 'status'
-```
 
 ### Rollbar MCP Lambda
 
@@ -203,21 +163,6 @@ npm run cli -- -s "cli-abc123-1234567890"
 
 ## 動作確認
 
-### Runtime ステータス確認
-
-```bash
-cd terraform
-RUNTIME_ID=$(terraform output -raw agent_runtime_id)
-
-aws bedrock-agentcore-control get-agent-runtime \
-  --agent-runtime-id "$RUNTIME_ID" \
-  --profile pn-playground-admin \
-  --region ap-northeast-1 \
-  --query 'status'
-```
-
-`"READY"` になるまで待つ。
-
 ### エージェント呼び出し
 
 ```bash
@@ -242,40 +187,6 @@ aws bedrock-agentcore invoke-agent-runtime \
 ```
 event: message
 data: {"text":"Hello! How can I assist you today?","sessionId":"test-session-..."}
-```
-
-### Memory 動作確認
-
-同じ `SESSION_ID` で複数回送信し、前の会話を覚えているか確認する:
-
-```bash
-cd terraform
-RUNTIME_ARN=$(terraform output -raw agent_runtime_arn)
-SESSION_ID="memory-test-$(date +%s)-abcdefghijklmnop"
-
-# 1回目: 名前を伝える
-PAYLOAD=$(printf '{"prompt":"Hello, my name is Kaita.", "sessionId":"%s"}' "$SESSION_ID" | base64)
-aws bedrock-agentcore invoke-agent-runtime \
-  --agent-runtime-arn "$RUNTIME_ARN" \
-  --payload "$PAYLOAD" \
-  --content-type "application/json" \
-  --accept "text/event-stream" \
-  --runtime-session-id "$SESSION_ID" \
-  --profile pn-playground-admin \
-  --region ap-northeast-1 \
-  response.json && cat response.json
-
-# 2回目: 名前を聞く（記憶されていれば正しく答える）
-PAYLOAD=$(printf '{"prompt":"What is my name?", "sessionId":"%s"}' "$SESSION_ID" | base64)
-aws bedrock-agentcore invoke-agent-runtime \
-  --agent-runtime-arn "$RUNTIME_ARN" \
-  --payload "$PAYLOAD" \
-  --content-type "application/json" \
-  --accept "text/event-stream" \
-  --runtime-session-id "$SESSION_ID" \
-  --profile pn-playground-admin \
-  --region ap-northeast-1 \
-  response.json && cat response.json
 ```
 
 ---
@@ -324,54 +235,6 @@ docker run --rm \
 ---
 
 ## トラブルシューティング
-
-### `Received error (415) from runtime`
-
-`--content-type "application/json"` が抜けている。AWS CLI のデフォルトは `application/octet-stream` で Runtime が受け付けない。
-
-### `Received error (406) from runtime`
-
-`--accept "text/event-stream"` が抜けている。エージェントがストリーミングレスポンスを返すため必須。
-
-### `Received error (400) from runtime`
-
-payload の base64 エンコードを確認する:
-
-```bash
-echo "$PAYLOAD" | base64 -d
-```
-
-zsh では `!` が特殊文字として `\!` にエスケープされる。`printf` を使うか `!` を含まない文字列にする。
-
-### `Missing sessionId`
-
-`--runtime-session-id` は 33 文字以上必要。
-また AgentCore は sessionId ヘッダーをコンテナに転送しないため、**payload の body にも `sessionId` を含める**こと。
-
-### `Could not load credentials from any providers`
-
-IAM ロールに `bedrock:InvokeModel` 権限があるか、`AWS_REGION` 環境変数が設定されているか確認する。
-
-### Runtime が起動しない (`RuntimeClientError`)
-
-コンテナのログを確認する:
-
-```bash
-cd terraform
-RUNTIME_ID=$(terraform output -raw agent_runtime_id)
-
-aws logs filter-log-events \
-  --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT" \
-  --start-time $(($(date +%s) * 1000 - 3600000)) \
-  --profile pn-playground-admin \
-  --region ap-northeast-1
-```
-
-よくある原因:
-
-- Docker イメージが arm64 でビルドされていない
-- 環境変数が不足している
-- IAM ロールの権限が足りない
 
 ### Terraform 初回実行時の Runtime エラー
 

@@ -14,7 +14,8 @@ AgentCore Memory（会話履歴のセマンティック検索）と AgentCore Ga
 | `app/lambda-rollbar-mcp/`   | Rollbar MCP サーバー（TypeScript, Lambda）                      |
 | `app/lambda-slack-bot/`     | Slack Bot（TypeScript, Lambda）                                 |
 | `cli/`                      | Runtime を呼び出す CLI ツール（TypeScript）                     |
-| `terraform/`                | インフラ定義（ECR / IAM / Runtime / Memory / Gateway / Lambda） |
+| `terraform/`                | インフラ定義（ECR / IAM / Runtime / Memory / Gateway / Lambda / VPC） |
+| `product-workload/`         | 検証用 Product 環境（EKS / RDS / VPC）                         |
 | `scripts/`                  | ビルド & デプロイスクリプト                                     |
 | `docs/`                     | 設計・デプロイ・API リファレンス                                |
 
