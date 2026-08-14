@@ -46,5 +46,6 @@ npm run cli -- "過去1時間の CloudWatch アラームを一覧して"
 
 - [`docs/architecture.md`](docs/architecture.md) — システム構成・データフロー・IAM 権限
 - [`docs/deployment-guide.md`](docs/deployment-guide.md) — デプロイ手順・ローカル開発・トラブルシューティング
+- [`docs/network-architecture-decisions.md`](docs/network-architecture-decisions.md) — ネットワーク・アーキテクチャの意思決定
 - [`docs/memory-api-reference.md`](docs/memory-api-reference.md) — AgentCore Memory API リファレンス
 </content>
