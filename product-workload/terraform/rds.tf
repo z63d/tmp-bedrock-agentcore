@@ -51,3 +51,29 @@ resource "aws_db_instance" "main" {
   publicly_accessible = false
   skip_final_snapshot = true
 }
+
+#------------------------------------------------------------------------------
+# AgentCore Runtime User Credentials
+#------------------------------------------------------------------------------
+
+ephemeral "random_password" "rds_mysql_agentcore_runtime" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "rds_mysql_agentcore_runtime" {
+  name                    = "${var.project_name}/rds-mysql-agentcore-runtime"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret_version" "rds_mysql_agentcore_runtime" {
+  secret_id = aws_secretsmanager_secret.rds_mysql_agentcore_runtime.id
+  secret_string_wo = jsonencode({
+    host     = aws_db_instance.main.address
+    port     = aws_db_instance.main.port
+    dbname   = "app"
+    username = "agentcore-runtime"
+    password = ephemeral.random_password.rds_mysql_agentcore_runtime.result
+  })
+  secret_string_wo_version = 1
+}
