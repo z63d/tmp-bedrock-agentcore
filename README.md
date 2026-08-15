@@ -19,28 +19,9 @@ AgentCore Memory（会話履歴のセマンティック検索）と AgentCore Ga
 | `scripts/`                  | ビルド & デプロイスクリプト                                     |
 | `docs/`                     | 設計・デプロイ・API リファレンス                                |
 
-## クイックスタート
+## セットアップ
 
-```bash
-# 1. Rollbar MCP Lambda をビルド
-cd app/lambda-rollbar-mcp && npm install && npm run build
-
-# 2. Terraform で AWS リソースを作成（Runtime 以外）
-cd terraform && terraform init && terraform apply
-
-# 3. エージェント本体のコンテナをビルド & ECR に push
-./scripts/deploy.sh
-
-# 4. Terraform 再 apply（Runtime を作成）
-cd terraform && terraform apply
-
-# 5. CLI で呼び出す
-cd cli && npm install && cp .env.example .env
-# .env に AGENT_RUNTIME_ARN を設定してから
-npm run cli -- "過去1時間の CloudWatch アラームを一覧して"
-```
-
-詳細は [`docs/deployment-guide.md`](docs/deployment-guide.md) を参照。
+[`docs/deployment-guide.md`](docs/deployment-guide.md) を参照。
 
 ## ドキュメント
 
