@@ -12,6 +12,25 @@ resource "aws_ecr_repository" "agent" {
   }
 }
 
+resource "aws_ecr_lifecycle_policy" "agent" {
+  repository = aws_ecr_repository.agent.name
+
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "Keep last 10 images"
+      selection = {
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 10
+      }
+      action = {
+        type = "expire"
+      }
+    }]
+  })
+}
+
 #------------------------------------------------------------------------------
 # IAM Role for AgentCore Runtime
 #------------------------------------------------------------------------------
@@ -167,6 +186,10 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     EKS_CLUSTER_NAME = var.eks_cluster_name
     MYSQL_SECRET_ARN = var.mysql_secret_arn
     PYTHONUNBUFFERED = "1"
+  }
+
+  protocol_configuration {
+    server_protocol = "HTTP"
   }
 
   depends_on = [aws_bedrockagentcore_memory_strategy.semantic]
