@@ -31,9 +31,10 @@ from bedrock_agentcore_app.prompts import INVESTIGATION_SYSTEM_PROMPT, ORCHESTRA
 class MemoryClient:
     """Simple client for AgentCore Memory API."""
 
-    def __init__(self, region: str, memory_id: str) -> None:
+    def __init__(self, region: str, memory_id: str, namespace: str) -> None:
         self.region = region
         self.memory_id = memory_id
+        self.namespace = namespace
         self._client: Any = None
 
     def _get_client(self) -> Any:
@@ -47,7 +48,7 @@ class MemoryClient:
         try:
             response = client.retrieve_memory_records(
                 memoryId=self.memory_id,
-                namespace="/",
+                namespace=self.namespace,
                 searchCriteria={"searchQuery": query, "topK": top_k},
             )
             return response.get("memoryRecordSummaries", [])
@@ -113,6 +114,7 @@ logger = structlog.get_logger()
 region = os.environ.get("AWS_REGION", "ap-northeast-1")
 model_id = os.environ["BEDROCK_MODEL_ID"]
 memory_id = os.environ.get("MEMORY_ID")
+memory_namespace = os.environ.get("MEMORY_NAMESPACE", "/")
 gateway_id = os.environ.get("GATEWAY_ID")
 eks_cluster_name = os.environ.get("EKS_CLUSTER_NAME")
 mysql_secret_arn = os.environ.get("MYSQL_SECRET_ARN")
@@ -120,7 +122,7 @@ mysql_secret_arn = os.environ.get("MYSQL_SECRET_ARN")
 # Initialize Memory Client (optional)
 memory_client: MemoryClient | None = None
 if memory_id:
-    memory_client = MemoryClient(region=region, memory_id=memory_id)
+    memory_client = MemoryClient(region=region, memory_id=memory_id, namespace=memory_namespace)
     logger.info("Memory enabled", memory_id=memory_id)
 else:
     logger.info("Memory disabled (MEMORY_ID not set)")

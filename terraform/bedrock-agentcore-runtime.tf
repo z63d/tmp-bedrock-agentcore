@@ -182,6 +182,7 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     AWS_REGION       = var.aws_region
     BEDROCK_MODEL_ID = "jp.anthropic.claude-haiku-4-5-20251001-v1:0"
     MEMORY_ID        = aws_bedrockagentcore_memory.main.id
+    MEMORY_NAMESPACE = "/strategies/${aws_bedrockagentcore_memory_strategy.semantic.memory_strategy_id}/actors/user/"
     GATEWAY_ID       = aws_bedrockagentcore_gateway.main.gateway_id
     EKS_CLUSTER_NAME = var.eks_cluster_name
     MYSQL_SECRET_ARN = var.mysql_secret_arn
