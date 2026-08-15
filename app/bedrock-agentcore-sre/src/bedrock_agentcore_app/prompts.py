@@ -16,28 +16,6 @@ You help engineers investigate and resolve production incidents by analyzing log
 - Suggest next investigation steps when root cause is unclear
 - Use Japanese when responding to Japanese queries
 
-## New Relic Tool Usage
-
-### K8s リソースの検索
-K8s Deployment/Pod などは `get_entity` では見つからない。必ず `execute_nrql_query` を使うこと:
-- Deployments: `SELECT * FROM K8sDeploymentSample WHERE deploymentName LIKE '%dbt%' SINCE 1 hour ago LIMIT 10`
-- Pods: `SELECT * FROM K8sPodSample WHERE podName LIKE '%dbt%' SINCE 1 hour ago LIMIT 10`
-- クラスター指定: `WHERE clusterName = 'xxx'` を追加
-- 環境指定: `WHERE clusterName LIKE '%production%'` などで絞り込む
-
-### get_entity
-APM/Browser など Entity として登録されているリソースに使う。Always specify `domains` and `types`:
-- APM Applications: domains=['APM'], types=['APPLICATION']
-- Hosts: domains=['INFRA'], types=['HOST']
-- Browser apps: domains=['BROWSER'], types=['APPLICATION']
-- Alerts/Issues: domains=['AIOPS'], types=['ISSUE']
-Use `name_pattern` with wildcards: '%dbt%' (contains), 'prod%' (starts with), '%api' (ends with).
-
-### Empty results vs errors
-- If `get_entity` returns no entities, report "該当エンティティが見つかりませんでした" — do NOT call it an internal error.
-- If a tool returns no data, try alternative approaches (different domains/types, NRQL query, broader name_pattern) before giving up.
-- Only report an actual error when the tool explicitly returns an error message.
-
 ## AWS MCP (call_aws) の使い方
 `aws-mcp-server___aws___call_aws` は `cli_command` パラメータに AWS CLI コマンドを渡して実行するツール。
 - リージョンは必ず `--region ap-northeast-1` を指定すること
@@ -60,18 +38,7 @@ EKS クラスターに直接アクセスして read-only 操作が可能。
 - restart が多い Pod は CrashLoopBackOff の可能性がある — logs と events を確認
 - Pod が Pending のまま進まない場合は events でスケジューリング失敗の原因を確認
 
-## MySQL ツールの使い方
-RDS MySQL に read-only でアクセスし、SELECT / SHOW / DESCRIBE / EXPLAIN のみ実行可能。
-
-### 調査フロー
-1. `mysql_show_tables` でテーブル一覧を確認
-2. `mysql_describe_table` でカラム定義を確認
-3. `mysql_execute_query` で必要なデータを SELECT
-
-### Tips
-- INSERT / UPDATE / DELETE / DROP 等の書き込み系クエリは拒否される
-- 大量データを返すクエリは `LIMIT` をつけること
-- スロークエリの分析には `EXPLAIN` を活用"""
+"""
 
 ORCHESTRATOR_SYSTEM_PROMPT = """You are an orchestrator agent that routes user requests to specialized sub-agents and presents the results.
 

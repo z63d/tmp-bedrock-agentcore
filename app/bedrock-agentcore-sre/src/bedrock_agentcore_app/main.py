@@ -17,12 +17,11 @@ import boto3
 import structlog
 from bedrock_agentcore import BedrockAgentCoreApp
 from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
-from strands import Agent
+from strands import Agent, AgentSkills
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 
 from bedrock_agentcore_app.prompts import INVESTIGATION_SYSTEM_PROMPT, ORCHESTRATOR_SYSTEM_PROMPT
-
 
 # =============================================================================
 # Memory Client
@@ -69,7 +68,12 @@ class MemoryClient:
                 eventTimestamp=datetime.now(timezone.utc),
                 payload=[
                     {"conversational": {"role": "USER", "content": {"text": user_message}}},
-                    {"conversational": {"role": "ASSISTANT", "content": {"text": assistant_message}}},
+                    {
+                        "conversational": {
+                            "role": "ASSISTANT",
+                            "content": {"text": assistant_message},
+                        }
+                    },
                 ],
             )
             logger.info("Stored conversation in memory", session_id=session_id)
@@ -177,6 +181,8 @@ def get_orchestrator() -> Agent:
         investigation_tools.extend(mysql_tools)
         logger.info("MySQL tools enabled")
 
+    skills_plugin = AgentSkills(skills=["./skills/newrelic", "./skills/mysql"])
+
     investigation_agent = Agent(
         name="investigation_agent",
         model=BedrockModel(
@@ -185,9 +191,12 @@ def get_orchestrator() -> Agent:
             max_tokens=4096,
         ),
         tools=investigation_tools,
+        plugins=[skills_plugin],
         system_prompt=INVESTIGATION_SYSTEM_PROMPT,
         callback_handler=None,
     )
+
+    orchestrator_skills = AgentSkills(skills=["./skills/report"])
 
     _orchestrator = Agent(
         model=BedrockModel(
@@ -201,6 +210,7 @@ def get_orchestrator() -> Agent:
                 description="SRE investigation specialist. Delegates infrastructure monitoring, log analysis, metric queries, error tracking, Kubernetes cluster inspection, MySQL database queries, and incident investigation tasks. Has access to New Relic, AWS CloudWatch, Rollbar tools via MCP Gateway, Kubernetes tools for EKS, and MySQL read-only query tools.",
             ),
         ],
+        plugins=[orchestrator_skills],
         system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
     )
 
@@ -242,7 +252,9 @@ async def invoke(payload: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
             ]
             if memory_texts:
                 memory_context = "\n".join(memory_texts)
-                context_prompt = f"[Previous context]\n{memory_context}\n\n[Current question]\n{prompt}"
+                context_prompt = (
+                    f"[Previous context]\n{memory_context}\n\n[Current question]\n{prompt}"
+                )
                 logger.info("Found relevant memories", count=len(memory_texts))
 
     agent = get_orchestrator()

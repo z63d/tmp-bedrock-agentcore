@@ -11,8 +11,9 @@ COPY pyproject.toml ./
 # Install dependencies with uv
 RUN uv pip install --system --no-cache .
 
-# Copy source code
+# Copy source code and skills
 COPY src/ ./src/
+COPY skills/ ./skills/
 
 # ===============================
 # Stage 2: Runtime
@@ -25,8 +26,9 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
+# Copy application code and skills
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/skills ./skills
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
