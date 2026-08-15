@@ -111,7 +111,7 @@ model_id = os.environ["BEDROCK_MODEL_ID"]
 memory_id = os.environ.get("MEMORY_ID")
 gateway_id = os.environ.get("GATEWAY_ID")
 eks_cluster_name = os.environ.get("EKS_CLUSTER_NAME")
-mysql_host = os.environ.get("MYSQL_HOST")
+mysql_secret_arn = os.environ.get("MYSQL_SECRET_ARN")
 
 # Initialize Memory Client (optional)
 memory_client: MemoryClient | None = None
@@ -171,11 +171,11 @@ def get_orchestrator() -> Agent:
         investigation_tools.extend(k8s_tools)
         logger.info("K8s tools enabled", cluster=eks_cluster_name)
 
-    if mysql_host:
+    if mysql_secret_arn:
         from bedrock_agentcore_app.tools.mysql import mysql_tools
 
         investigation_tools.extend(mysql_tools)
-        logger.info("MySQL tools enabled", host=mysql_host)
+        logger.info("MySQL tools enabled")
 
     investigation_agent = Agent(
         name="investigation_agent",

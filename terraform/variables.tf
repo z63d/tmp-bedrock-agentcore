@@ -25,22 +25,10 @@ variable "eks_cluster_name" {
   default     = "product-workload"
 }
 
-variable "mysql_host" {
-  description = "MySQL host:port for MySQL tools (empty = disabled)"
-  type        = string
-  default     = ""
-}
-
 variable "mysql_secret_arn" {
-  description = "Secrets Manager ARN for MySQL credentials"
+  description = "Secrets Manager ARN for MySQL credentials (empty = disabled). Secret must contain: username, password, host, port, dbname"
   type        = string
   default     = ""
-}
-
-variable "mysql_database" {
-  description = "MySQL database name"
-  type        = string
-  default     = "app"
 }
 
 #------------------------------------------------------------------------------

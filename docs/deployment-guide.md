@@ -7,7 +7,8 @@ Rollbar MCP Lambda・Slack Bot Lambda は ZIP デプロイのため Terraform �
 
 ### Step 1: Terraform 変数の準備
 
-`terraform/terraform.tfvars` を作成（git 管理外）:
+`terraform/terraform.tfvars` を作成（git 管理外）。
+EKS / MySQL の設定は product-workload セットアップ後に追加する（[`product-workload/README.md`](../product-workload/README.md) 参照）。
 
 ### Step 2: Lambda のビルド
 
