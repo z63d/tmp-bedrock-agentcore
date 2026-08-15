@@ -188,6 +188,11 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     PYTHONUNBUFFERED = "1"
   }
 
+  lifecycle_configuration {
+    idle_runtime_session_timeout = 600
+    max_lifetime                 = 1800
+  }
+
   protocol_configuration {
     server_protocol = "HTTP"
   }
