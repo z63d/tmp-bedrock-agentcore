@@ -5,7 +5,7 @@
 resource "aws_bedrockagentcore_memory" "main" {
   name                  = replace(var.project_name, "-", "_")
   description           = "Memory for ${var.project_name} agent"
-  event_expiry_duration = 30
+  event_expiry_duration = 7
 }
 
 resource "aws_bedrockagentcore_memory_strategy" "semantic" {
