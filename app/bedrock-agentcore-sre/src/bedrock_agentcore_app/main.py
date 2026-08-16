@@ -19,6 +19,7 @@ from bedrock_agentcore import BedrockAgentCoreApp
 from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
 from strands import Agent, AgentSkills
 from strands.models import BedrockModel
+from strands.models.bedrock import CacheConfig
 from strands.tools.mcp import MCPClient
 
 from bedrock_agentcore_app.prompts import INVESTIGATION_SYSTEM_PROMPT, ORCHESTRATOR_SYSTEM_PROMPT
@@ -191,6 +192,7 @@ def get_orchestrator() -> Agent:
             region_name=region,
             model_id=model_id,
             max_tokens=4096,
+            cache_config=CacheConfig(strategy="auto"),
         ),
         tools=investigation_tools,
         plugins=[skills_plugin],
@@ -205,6 +207,7 @@ def get_orchestrator() -> Agent:
             region_name=region,
             model_id=model_id,
             max_tokens=4096,
+            cache_config=CacheConfig(strategy="auto"),
         ),
         tools=[
             investigation_agent.as_tool(
