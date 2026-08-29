@@ -57,6 +57,28 @@ class MemoryClient:
             logger.warning("Failed to search memories", error=str(e))
             return []
 
+    async def get_conversation_history(self, session_id: str) -> list[dict[str, str]]:
+        """Get conversation history for a session (short-term memory)."""
+        client = self._get_client()
+        try:
+            response = client.list_events(
+                memoryId=self.memory_id,
+                sessionId=session_id,
+                actorId="user",
+            )
+            turns: list[dict[str, str]] = []
+            for event in response.get("events", []):
+                for item in event.get("payload", []):
+                    conv = item.get("conversational", {})
+                    role = conv.get("role", "")
+                    text = conv.get("content", {}).get("text", "")
+                    if role and text:
+                        turns.append({"role": role, "text": text})
+            return turns
+        except Exception as e:
+            logger.warning("Failed to get conversation history", error=str(e))
+            return []
+
     async def store_conversation(
         self, session_id: str, user_message: str, assistant_message: str
     ) -> None:
@@ -150,23 +172,16 @@ else:
 # Create BedrockAgentCoreApp instance
 app = BedrockAgentCoreApp()
 
-# Create agents (singleton, lazy initialization)
-_orchestrator: Agent | None = None
+# Shared components (singleton, lazy initialization)
+_investigation_agent: Agent | None = None
 
 
-def get_orchestrator() -> Agent:
-    """Get or create the orchestrator Agent (singleton pattern)."""
-    global _orchestrator
+def _get_investigation_agent() -> Agent:
+    """Get or create the investigation agent (singleton, stateless via as_tool preserve_context=False)."""
+    global _investigation_agent
 
-    if _orchestrator is not None:
-        return _orchestrator
-
-    logger.info(
-        "Creating multi-agent system",
-        region=region,
-        model_id=model_id,
-        mcp_enabled=mcp_client is not None,
-    )
+    if _investigation_agent is not None:
+        return _investigation_agent
 
     investigation_tools: list[Any] = []
     if mcp_client:
@@ -184,9 +199,7 @@ def get_orchestrator() -> Agent:
         investigation_tools.extend(mysql_tools)
         logger.info("MySQL tools enabled")
 
-    skills_plugin = AgentSkills(skills=["./skills/newrelic", "./skills/mysql"])
-
-    investigation_agent = Agent(
+    _investigation_agent = Agent(
         name="investigation_agent",
         model=BedrockModel(
             region_name=region,
@@ -195,14 +208,26 @@ def get_orchestrator() -> Agent:
             cache_config=CacheConfig(strategy="auto"),
         ),
         tools=investigation_tools,
-        plugins=[skills_plugin],
+        plugins=[AgentSkills(skills=["./skills/newrelic", "./skills/mysql"])],
         system_prompt=INVESTIGATION_SYSTEM_PROMPT,
         callback_handler=None,
     )
 
-    orchestrator_skills = AgentSkills(skills=["./skills/report"])
+    logger.info(
+        "Investigation agent created",
+        region=region,
+        model_id=model_id,
+        mcp_enabled=mcp_client is not None,
+    )
 
-    _orchestrator = Agent(
+    return _investigation_agent
+
+
+def create_orchestrator() -> Agent:
+    """Create a new orchestrator agent per request (stateless, no in-memory conversation history)."""
+    investigation_agent = _get_investigation_agent()
+
+    return Agent(
         model=BedrockModel(
             region_name=region,
             model_id=model_id,
@@ -215,11 +240,9 @@ def get_orchestrator() -> Agent:
                 description="SRE investigation specialist. Delegates infrastructure monitoring, log analysis, metric queries, error tracking, Kubernetes cluster inspection, MySQL database queries, and incident investigation tasks. Has access to New Relic, AWS CloudWatch, Rollbar tools via MCP Gateway, Kubernetes tools for EKS, and MySQL read-only query tools.",
             ),
         ],
-        plugins=[orchestrator_skills],
+        plugins=[AgentSkills(skills=["./skills/report"])],
         system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
     )
-
-    return _orchestrator
 
 
 # =============================================================================
@@ -245,24 +268,25 @@ async def invoke(payload: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         yield {"error": "prompt is required", "sessionId": session_id}
         return
 
-    # Build context with memory
-    context_prompt = prompt
+    # Build context from AgentCore Memory (STM + LTM)
+    context_parts: list[str] = []
     if memory_client:
-        memories = await memory_client.search_memories(prompt, top_k=3)
-        if memories:
-            memory_texts = [
-                m.get("content", {}).get("text", "")
-                for m in memories
-                if m.get("content", {}).get("text")
-            ]
+        stm, ltm = await memory_client.get_conversation_history(session_id), await memory_client.search_memories(prompt, top_k=3)
+
+        if stm:
+            history = "\n".join(f"{t['role']}: {t['text']}" for t in stm)
+            context_parts.append(f"[Conversation history]\n{history}")
+            logger.info("Restored conversation history", session_id=session_id, turns=len(stm))
+
+        if ltm:
+            memory_texts = [m.get("content", {}).get("text", "") for m in ltm if m.get("content", {}).get("text")]
             if memory_texts:
-                memory_context = "\n".join(memory_texts)
-                context_prompt = (
-                    f"[Previous context]\n{memory_context}\n\n[Current question]\n{prompt}"
-                )
+                context_parts.append(f"[Long-term memory]\n" + "\n".join(memory_texts))
                 logger.info("Found relevant memories", count=len(memory_texts))
 
-    agent = get_orchestrator()
+    context_prompt = "\n\n".join([*context_parts, f"[Current question]\n{prompt}"]) if context_parts else prompt
+
+    agent = create_orchestrator()
 
     try:
         result = agent(context_prompt)
