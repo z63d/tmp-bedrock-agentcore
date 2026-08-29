@@ -38,6 +38,16 @@ output "memory_arn" {
   value       = aws_bedrockagentcore_memory.main.arn
 }
 
+output "memory_strategy_id" {
+  description = "ID of the semantic memory strategy"
+  value       = aws_bedrockagentcore_memory_strategy.semantic.memory_strategy_id
+}
+
+output "memory_namespace" {
+  description = "Namespace for memory records"
+  value       = "/strategies/${aws_bedrockagentcore_memory_strategy.semantic.memory_strategy_id}/actors/user/"
+}
+
 output "gateway_id" {
   description = "ID of the AgentCore Gateway"
   value       = aws_bedrockagentcore_gateway.main.gateway_id

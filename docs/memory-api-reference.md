@@ -5,8 +5,9 @@
 ## 前提条件
 
 ```bash
-# Memory IDを取得
-MEMORY_ID=$(cd terraform && terraform output -raw memory_id)
+# Memory ID・Namespaceを取得
+MEMORY_ID=$(terraform output -raw memory_id)
+NAMESPACE=$(terraform output -raw memory_namespace)
 
 # プロファイルとリージョン
 PROFILE="pn-playground-admin"
@@ -26,10 +27,10 @@ Memory
 └── Memory Records (長期記憶 = 抽出されたファクト)
 ```
 
-| コンポーネント | 説明 | 保持期間 |
-|--------------|------|---------|
-| **Events** | 生の会話履歴（USER/ASSISTANT） | `event_expiry_duration`で設定 |
-| **Memory Records** | 会話から抽出されたファクト | 永続 |
+| コンポーネント     | 説明                           | 保持期間                      |
+| ------------------ | ------------------------------ | ----------------------------- |
+| **Events**         | 生の会話履歴（USER/ASSISTANT） | `event_expiry_duration`で設定 |
+| **Memory Records** | 会話から抽出されたファクト     | 永続                          |
 
 ---
 
@@ -44,7 +45,7 @@ namespace配下の全メモリレコードを一覧取得:
 ```bash
 aws bedrock-agentcore list-memory-records \
   --memory-id "$MEMORY_ID" \
-  --namespace "/" \
+  --namespace "$NAMESPACE" \
   --profile $PROFILE \
   --region $REGION
 ```
@@ -53,30 +54,26 @@ aws bedrock-agentcore list-memory-records \
 
 ```json
 {
-    "memoryRecordSummaries": [
-        {
-            "memoryRecordId": "mem-407d526c-b44f-4546-8da2-5cbb7c5a8065",
-            "content": {
-                "text": "The user likes Japanese idols."
-            },
-            "memoryStrategyId": "semantic_memory-X9TzZNBlUc",
-            "namespaces": [
-                "/strategies/semantic_memory-X9TzZNBlUc/actors/user/"
-            ],
-            "createdAt": "2026-03-01T23:35:15.048000+09:00"
-        },
-        {
-            "memoryRecordId": "mem-54dc11e2-b348-4f48-8024-dac87520b41a",
-            "content": {
-                "text": "The user's name is Kaita."
-            },
-            "memoryStrategyId": "semantic_memory-X9TzZNBlUc",
-            "namespaces": [
-                "/strategies/semantic_memory-X9TzZNBlUc/actors/user/"
-            ],
-            "createdAt": "2026-03-01T23:28:49.900000+09:00"
-        }
-    ]
+  "memoryRecordSummaries": [
+    {
+      "memoryRecordId": "mem-407d526c-b44f-4546-8da2-5cbb7c5a8065",
+      "content": {
+        "text": "The user likes Japanese idols."
+      },
+      "memoryStrategyId": "semantic_memory-X9TzZNBlUc",
+      "namespaces": ["/strategies/semantic_memory-X9TzZNBlUc/actors/user/"],
+      "createdAt": "2026-03-01T23:35:15.048000+09:00"
+    },
+    {
+      "memoryRecordId": "mem-54dc11e2-b348-4f48-8024-dac87520b41a",
+      "content": {
+        "text": "The user's name is Kaita."
+      },
+      "memoryStrategyId": "semantic_memory-X9TzZNBlUc",
+      "namespaces": ["/strategies/semantic_memory-X9TzZNBlUc/actors/user/"],
+      "createdAt": "2026-03-01T23:28:49.900000+09:00"
+    }
+  ]
 }
 ```
 
@@ -87,7 +84,7 @@ aws bedrock-agentcore list-memory-records \
 ```bash
 aws bedrock-agentcore retrieve-memory-records \
   --memory-id "$MEMORY_ID" \
-  --namespace "/" \
+  --namespace "$NAMESPACE" \
   --search-criteria '{"searchQuery": "Kaita", "topK": 5}' \
   --profile $PROFILE \
   --region $REGION
@@ -95,11 +92,11 @@ aws bedrock-agentcore retrieve-memory-records \
 
 **パラメータ:**
 
-| パラメータ | 説明 |
-|-----------|------|
-| `searchQuery` | 検索クエリ（セマンティック検索） |
-| `topK` | 返す結果の最大数 |
-| `memoryStrategyId` | 特定のストラテジーでフィルタ |
+| パラメータ         | 説明                             |
+| ------------------ | -------------------------------- |
+| `searchQuery`      | 検索クエリ（セマンティック検索） |
+| `topK`             | 返す結果の最大数                 |
+| `memoryStrategyId` | 特定のストラテジーでフィルタ     |
 
 ---
 
@@ -121,18 +118,18 @@ aws bedrock-agentcore list-sessions \
 
 ```json
 {
-    "sessionSummaries": [
-        {
-            "sessionId": "memory-test-1772375523-abcdefghijklmnop",
-            "actorId": "user",
-            "createdAt": "2026-03-01T23:35:15.177000+09:00"
-        },
-        {
-            "sessionId": "test-1772375646-abcdefghijklmnopqrstuvwxyz",
-            "actorId": "user",
-            "createdAt": "2026-03-01T23:34:08.203000+09:00"
-        }
-    ]
+  "sessionSummaries": [
+    {
+      "sessionId": "memory-test-1772375523-abcdefghijklmnop",
+      "actorId": "user",
+      "createdAt": "2026-03-01T23:35:15.177000+09:00"
+    },
+    {
+      "sessionId": "test-1772375646-abcdefghijklmnopqrstuvwxyz",
+      "actorId": "user",
+      "createdAt": "2026-03-01T23:34:08.203000+09:00"
+    }
+  ]
 }
 ```
 
@@ -159,27 +156,27 @@ aws bedrock-agentcore list-events \
 
 ```json
 {
-    "events": [
+  "events": [
+    {
+      "eventId": "0000001772375782346#c5e4dee5",
+      "eventTimestamp": "2026-03-01T23:36:22.346000+09:00",
+      "payload": [
         {
-            "eventId": "0000001772375782346#c5e4dee5",
-            "eventTimestamp": "2026-03-01T23:36:22.346000+09:00",
-            "payload": [
-                {
-                    "conversational": {
-                        "content": { "text": "あなたのおすすめは?" },
-                        "role": "USER"
-                    }
-                },
-                {
-                    "conversational": {
-                        "content": { "text": "Kaita, あなたのおすすめは難しいですが..." },
-                        "role": "ASSISTANT"
-                    }
-                }
-            ],
-            "branch": { "name": "main" }
+          "conversational": {
+            "content": { "text": "あなたのおすすめは?" },
+            "role": "USER"
+          }
+        },
+        {
+          "conversational": {
+            "content": { "text": "Kaita, あなたのおすすめは難しいですが..." },
+            "role": "ASSISTANT"
+          }
         }
-    ]
+      ],
+      "branch": { "name": "main" }
+    }
+  ]
 }
 ```
 
@@ -194,7 +191,7 @@ MEMORY_ID=$(cd terraform && terraform output -raw memory_id)
 
 aws bedrock-agentcore list-memory-records \
   --memory-id "$MEMORY_ID" \
-  --namespace "/" \
+  --namespace "$NAMESPACE" \
   --profile pn-playground-admin \
   --region ap-northeast-1
 ```
@@ -204,7 +201,7 @@ aws bedrock-agentcore list-memory-records \
 ```bash
 aws bedrock-agentcore retrieve-memory-records \
   --memory-id "$MEMORY_ID" \
-  --namespace "/" \
+  --namespace "$NAMESPACE" \
   --search-criteria '{"searchQuery": "name"}' \
   --profile pn-playground-admin \
   --region ap-northeast-1
@@ -235,7 +232,7 @@ aws bedrock-agentcore list-events \
 # メモリレコードのテキストのみ
 aws bedrock-agentcore list-memory-records \
   --memory-id "$MEMORY_ID" \
-  --namespace "/" \
+  --namespace "$NAMESPACE" \
   --profile pn-playground-admin \
   --region ap-northeast-1 \
   | jq -r '.memoryRecordSummaries[].content.text'
@@ -249,13 +246,13 @@ aws bedrock-agentcore list-memory-records \
 
 ## 5. Memory API 一覧
 
-| API | 用途 | 必須パラメータ |
-|-----|------|---------------|
-| `list-memory-records` | メモリレコード一覧 | `memoryId`, `namespace` |
-| `retrieve-memory-records` | セマンティック検索 | `memoryId`, `namespace`, `searchCriteria` |
-| `list-sessions` | セッション一覧 | `memoryId`, `actorId` |
-| `list-events` | イベント一覧 | `memoryId`, `sessionId`, `actorId` |
-| `get-event` | 特定イベント取得 | `memoryId`, `sessionId`, `actorId`, `eventId` |
+| API                       | 用途               | 必須パラメータ                                |
+| ------------------------- | ------------------ | --------------------------------------------- |
+| `list-memory-records`     | メモリレコード一覧 | `memoryId`, `namespace`                       |
+| `retrieve-memory-records` | セマンティック検索 | `memoryId`, `namespace`, `searchCriteria`     |
+| `list-sessions`           | セッション一覧     | `memoryId`, `actorId`                         |
+| `list-events`             | イベント一覧       | `memoryId`, `sessionId`, `actorId`            |
+| `get-event`               | 特定イベント取得   | `memoryId`, `sessionId`, `actorId`, `eventId` |
 
 ---
 
@@ -269,9 +266,10 @@ aws bedrock-agentcore list-memory-records \
 
 ### namespace の指定
 
-- `/` はルートnamespace（全てのレコードを取得）
+- CLI の `--namespace` は**完全一致**のみ（プレフィックス検索は不可）
 - Memory Strategyで設定した`namespaces`パターンに基づいて格納されます
-- 例: `/strategies/{memoryStrategyId}/actors/{actorId}/`
+- 実際のパス: `/strategies/{memoryStrategyId}/actors/{actorId}/`
+- `terraform output -raw memory_namespace` で取得可能
 
 ### IAM権限
 
