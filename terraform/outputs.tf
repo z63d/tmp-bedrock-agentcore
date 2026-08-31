@@ -45,7 +45,7 @@ output "memory_strategy_id" {
 
 output "memory_namespace" {
   description = "Namespace for memory records"
-  value       = "/strategies/${aws_bedrockagentcore_memory_strategy.semantic.memory_strategy_id}/actors/user/"
+  value       = "/strategies/${aws_bedrockagentcore_memory_strategy.semantic.memory_strategy_id}/"
 }
 
 output "gateway_id" {

@@ -61,7 +61,7 @@ aws bedrock-agentcore list-memory-records \
         "text": "The user likes Japanese idols."
       },
       "memoryStrategyId": "semantic_memory-X9TzZNBlUc",
-      "namespaces": ["/strategies/semantic_memory-X9TzZNBlUc/actors/user/"],
+      "namespaces": ["/strategies/semantic_memory-X9TzZNBlUc/"],
       "createdAt": "2026-03-01T23:35:15.048000+09:00"
     },
     {
@@ -70,7 +70,7 @@ aws bedrock-agentcore list-memory-records \
         "text": "The user's name is Kaita."
       },
       "memoryStrategyId": "semantic_memory-X9TzZNBlUc",
-      "namespaces": ["/strategies/semantic_memory-X9TzZNBlUc/actors/user/"],
+      "namespaces": ["/strategies/semantic_memory-X9TzZNBlUc/"],
       "createdAt": "2026-03-01T23:28:49.900000+09:00"
     }
   ]
@@ -268,7 +268,7 @@ aws bedrock-agentcore list-memory-records \
 
 - CLI の `--namespace` は**完全一致**のみ（プレフィックス検索は不可）
 - Memory Strategyで設定した`namespaces`パターンに基づいて格納されます
-- 実際のパス: `/strategies/{memoryStrategyId}/actors/{actorId}/`
+- 実際のパス: `/strategies/{memoryStrategyId}/`
 - `terraform output -raw memory_namespace` で取得可能
 
 ### IAM権限

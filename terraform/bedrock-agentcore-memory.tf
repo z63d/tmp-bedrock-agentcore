@@ -12,5 +12,5 @@ resource "aws_bedrockagentcore_memory_strategy" "semantic" {
   name                = "semantic_memory"
   memory_id           = aws_bedrockagentcore_memory.main.id
   type                = "SEMANTIC"
-  namespace_templates = ["/strategies/{memoryStrategyId}/actors/{actorId}/"]
+  namespace_templates = ["/strategies/{memoryStrategyId}/"]
 }
