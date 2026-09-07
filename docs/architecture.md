@@ -2,50 +2,11 @@
 
 ## システム構成図
 
-```
-ユーザー / CLI / Slack Bot
-      │  InvokeAgentRuntime (SigV4)
-      ▼
-┌──────────────────────────────────────────────────────┐
-│  AgentCore Runtime (ECS/Fargate, arm64)               │
-│  bedrock-agentcore-sre — Python 3.13 / Strands Agents │
-│                                                       │
-│  BedrockModel (claude-haiku-4.5 等)                   │
-│  MCPClient → Gateway                                 │
-│  MemoryClient → Memory API                           │
-│  K8s Tools → EKS API (kubernetes client)             │
-└───┬──────────┬──────────────────┬────────────────────┘
-    │          │                  │
-    │ Memory   │ InvokeGateway    │ K8s API (HTTPS)
-    ▼          ▼                  │ VPC Peering 経由
-┌────────┐ ┌──────────────┐      │
-│Memory  │ │ Gateway      │      ▼
-│(Seman.)│ │ (MCP / IAM)  │  EKS / RDS (Product VPC)
-└────────┘ └──────┬───────┘
-          ┌───────┴────────┐
-          │ Lambda / MCP   │
-          ▼                ▼
-   ┌───────────┐  ┌────────────┐
-   │ Rollbar   │  │ New Relic  │
-   │ MCP       │  │ MCP        │
-   │ (Lambda)  │  │ (公式)     │
-   └───────────┘  └────────────┘
-```
+[`architecture-diagram.html`](./architecture-diagram.html) を参照。
 
 ## ネットワーク構成
 
-```
-AgentCore VPC (10.1.0.0/16, ap-northeast-1d)
-├── public subnet  (10.1.0.0/24)  — NAT Gateway
-├── private subnet (10.1.10.0/24) — AgentCore Runtime ENI
-├── S3 Gateway Endpoint
-└── VPC Peering ──► Product VPC
-```
-
-- Runtime は VPC モードで private subnet に ENI を配置（Security Hub `BedrockAgentCore.1` 準拠）
-- 外部 API（New Relic MCP 等）は NAT Gateway 経由
-- EKS / RDS へは VPC Peering 経由で直接アクセス
-- Product VPC の構成は [`product-workload/README.md`](../product-workload/README.md) を参照
+[`network-architecture-decisions.md`](./network-architecture-decisions.md) を参照。
 
 ## コンポーネント
 
@@ -78,14 +39,22 @@ Runtime に組み込みの Strands Agent ツール。`kubernetes` Python ライ�
 
 ### AgentCore Memory
 
-会話ターンを `CreateEvent` で保存し、`RetrieveMemoryRecords` でベクトル類似検索する。
-Memory Strategy は `SEMANTIC` タイプを使用。イベントの保持期間は 30 日。
+Agent はステートレス（リクエストごとに新規生成）。会話の記憶は全て AgentCore Memory に外部化。
+
+- **STM（短期記憶）**: `ListEvents` でセッション内の会話履歴を復元
+- **LTM（長期記憶）**: `RetrieveMemoryRecords` でセッション横断のファクトをセマンティック検索
+- **保存**: `CreateEvent` で会話ターンを保存。バックグラウンドで Memory Strategy が LTM を自動抽出
+
+Memory Strategy は `SEMANTIC` タイプ。namespace は `/strategies/{memoryStrategyId}/`（actorId 分離なし、全セッションで共有）。
 
 リクエスト処理フロー:
 
-1. `RetrieveMemoryRecords` で過去の関連会話を取得 (top_k=3)
-2. 取得できた場合は `[Previous context]` として現在のプロンプトと結合
-3. Agent 実行後、会話ターンを `CreateEvent` で保存
+1. `ListEvents(session_id)` で同一スレッドの過去の会話を復元 → `[Conversation history]`
+2. `RetrieveMemoryRecords(prompt)` で関連ファクトを検索 → `[Long-term memory]`
+3. Orchestrator を新規生成し、コンテキスト付きプロンプトで実行
+4. Agent 実行後、会話ターンを `CreateEvent` で保存
+
+設計判断の詳細は [`memory-architecture-decisions.md`](./memory-architecture-decisions.md) を参照。
 
 ### AgentCore Gateway
 
@@ -110,11 +79,13 @@ AgentCore Runtime と各種ツールバックエンドの間を中継するマ�
 ## データフロー（インシデント調査の例）
 
 ```
-1. ユーザー → "過去1時間の 5xx エラーを分析して"
+1. ユーザー → Slack Bot Lambda → AgentCore Runtime (VPC Endpoint 経由)
 
-2. Runtime: Memory を検索（関連する過去会話があれば context に追加）
+2. STM 復元: ListEvents(session_id) で同一スレッドの会話履歴を取得
+   LTM 検索: RetrieveMemoryRecords(prompt) で関連ファクトを取得
 
-3. Strands Agent → Bedrock モデル呼び出し
+3. Orchestrator を新規生成（ステートレス）
+   Strands Agent → Bedrock モデル呼び出し
    モデルが get_active_alarms / analyze_log_group 等を選択
 
 4. Runtime → Gateway (InvokeGateway, SigV4)
@@ -128,4 +99,5 @@ AgentCore Runtime と各種ツールバックエンドの間を中継するマ�
 7. Runtime → ユーザーへ SSE レスポンス
 
 8. Runtime: 会話ターンを Memory に保存（CreateEvent）
+   → バックグラウンドで SEMANTIC Strategy がファクトを自動抽出 → LTM に反映
 ```

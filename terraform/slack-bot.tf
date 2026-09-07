@@ -57,6 +57,16 @@ resource "aws_iam_role_policy" "slack_bot_lambda" {
         Resource = "arn:aws:lambda:${var.aws_region}:${local.account_id}:function:${var.project_name}-slack-bot"
       },
       {
+        Sid    = "VPCAccess"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateNetworkInterface",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DeleteNetworkInterface"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "SecretsAccess"
         Effect = "Allow"
         Action = [
@@ -138,6 +148,11 @@ resource "aws_lambda_function" "slack_bot" {
       ALLOWED_SLACK_CHANNEL_IDS       = join(",", var.allowed_slack_channel_ids)
       ALLOWED_SLACK_USER_IDS          = join(",", var.allowed_slack_user_ids)
     }
+  }
+
+  vpc_config {
+    subnet_ids         = [aws_subnet.private.id]
+    security_group_ids = [aws_security_group.slack_bot_lambda.id]
   }
 
   depends_on = [aws_iam_role_policy.slack_bot_lambda]

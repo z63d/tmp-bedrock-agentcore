@@ -2,22 +2,33 @@
 
 AgentCore Runtime のネットワーク構成とセキュリティパターンの設計判断をまとめる。
 
-## 採用パターン: Pattern 2 (VPC Connectivity via ENIs)
+## 採用パターン: Pattern 3 (VPC + PrivateLink + Resource Policy)
 
-AWS が提示する [4 段階のネットワークパターン](https://aws.amazon.com/blogs/networking-and-content-delivery/network-connectivity-patterns-for-agents-deployed-on-amazon-bedrock-agentcore-runtime/) のうち、**Pattern 2** を採用した。
+AWS が提示する [4 段階のネットワークパターン](https://aws.amazon.com/blogs/networking-and-content-delivery/network-connectivity-patterns-for-agents-deployed-on-amazon-bedrock-agentcore-runtime/) のうち、**Pattern 3** を採用した。
 
 | Pattern | 概要 | 採否 |
 |---|---|---|
 | 1. Public Endpoint | デフォルト。全通信がインターネット経由 | 不採用 — Security Hub `BedrockAgentCore.1` 違反 |
-| 2. VPC + ENI | private subnet に ENI 配置。private リソースに直接アクセス可 | **採用** |
-| 3. VPC + PrivateLink | Pattern 2 + resource policy で public endpoint をブロック | 不採用 — 検証段階では過剰 |
+| 2. VPC + ENI | private subnet に ENI 配置。private リソースに直接アクセス可 | Pattern 3 の前提として採用 |
+| 3. VPC + PrivateLink | Pattern 2 + resource policy で public endpoint をブロック | **採用** |
 | 4. Isolated VPC | インターネット完全遮断。全 AWS サービスを VPC Endpoint 経由 | 不採用 — 外部 MCP (New Relic) にアクセス不可 |
 
 ### 選定理由
 
-- EKS / RDS など **private subnet のリソースに直接アクセス** する要件がある
+- EKS / RDS など **private subnet のリソースに直接アクセス** する要件がある（Pattern 2）
 - 外部 MCP サーバー (New Relic) へのアクセスが必要なため完全隔離 (Pattern 4) は不可
-- 検証段階のため Pattern 3 (PrivateLink + resource policy) は YAGNI
+- Resource policy (`aws:SourceVpc` Deny) で AgentCore Runtime をインターネットから完全に隔離（Pattern 3）
+- Runtime の VPC 接続は [AWS セキュリティベストプラクティス](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html#security-bp-network) でも推奨（private リソースアクセス + PrivateLink + VPC Flow Logs 監査）
+
+### Pattern 3 の実装
+
+Pattern 2 の VPC 接続に加えて、以下を追加:
+
+- **VPC Endpoint（2つ）**:
+  - `com.amazonaws.{region}.bedrock-agentcore` — Runtime / Memory API（`private_dns_enabled = true`）
+  - `com.amazonaws.{region}.bedrock-agentcore.gateway` — MCP Gateway（`private_dns_enabled = true`）
+- **Resource policy**: Slack Bot Lambda の IAM Role のみ Allow + `aws:SourceVpc` 条件で VPC 外からの全アクセスを Deny
+- **Slack Bot Lambda を VPC に配置**: private subnet に ENI を配置し、VPC Endpoint 経由で AgentCore を呼び出す。Slack API への通信は NAT GW 経由
 
 ## VPC 分離 + Peering
 
@@ -62,16 +73,23 @@ EKS / RDS など private リソースは Runtime コンテナから直接アク�
 - RDS は read-only ユーザーで接続 — DROP / DELETE 等は不可
 - SG の egress は全開放だが、EKS API (443) と RDS (3306) 以外は到達先がない
 
-## VPC Endpoint の判断
+## VPC Endpoint
 
-Interface VPC Endpoint ($7.2/月/AZ) は `bedrock-runtime` のみ検討したが、現時点では全て NAT GW 経由とした。
+Pattern 3 の実装に必要な VPC Endpoint に加え、S3 Gateway Endpoint を採用:
 
-- NAT GW がある時点でどれも必須ではない（コスト最適化の位置づけ）
-- 検証段階で月 $36+ の endpoint 代は割高
-- S3 Gateway Endpoint のみ採用（無料）
-- 本番化時に `bedrock-runtime` / `ecr` / `logs` の追加を検討
+| VPC Endpoint | タイプ | 用途 | private_dns | コスト |
+|---|---|---|---|---|
+| `s3` | Gateway | ECR イメージ取得等 | — | 無料 |
+| `bedrock-agentcore` | Interface | Runtime / Memory API | `true` | ~$7.2/月/AZ |
+| `bedrock-agentcore.gateway` | Interface | MCP Gateway | `true` | ~$7.2/月/AZ |
+
+- `bedrock-runtime` / `ecr` / `logs` 等は NAT GW 経由。本番化時にコスト最適化で追加を検討
 
 ## 参考
 
 - [Network connectivity patterns for agents deployed on Amazon Bedrock AgentCore Runtime](https://aws.amazon.com/blogs/networking-and-content-delivery/network-connectivity-patterns-for-agents-deployed-on-amazon-bedrock-agentcore-runtime/)
 - [Secure AI agent access patterns to AWS resources using Model Context Protocol](https://aws.amazon.com/blogs/security/secure-ai-agent-access-patterns-to-aws-resources-using-model-context-protocol/)
+- [Secure multi-tenant AI agents with Amazon Bedrock AgentCore resource-based policies](https://aws.amazon.com/blogs/security/secure-multi-tenant-ai-agents-with-amazon-bedrock-agentcore-resource-based-policies/)
+- [Secure ingress connectivity to Amazon Bedrock AgentCore Gateway using interface VPC endpoints](https://aws.amazon.com/blogs/machine-learning/secure-ingress-connectivity-to-amazon-bedrock-agentcore-gateway-using-interface-vpc-endpoints/)
+- [AgentCore Runtime security best practices](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html)
+- [AgentCore VPC interface endpoints](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/vpc-interface-endpoints.html)

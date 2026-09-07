@@ -201,6 +201,37 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
   depends_on = [aws_bedrockagentcore_memory_strategy.semantic]
 }
 
+resource "aws_bedrockagentcore_resource_policy" "vpc_only" {
+  resource_arn = aws_bedrockagentcore_agent_runtime.main.agent_runtime_arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowSlackBot"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.slack_bot_lambda.arn
+        }
+        Action   = "bedrock-agentcore:InvokeAgentRuntime"
+        Resource = aws_bedrockagentcore_agent_runtime.main.agent_runtime_arn
+      },
+      {
+        Sid       = "DenyNonVpc"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "bedrock-agentcore:InvokeAgentRuntime"
+        Resource  = aws_bedrockagentcore_agent_runtime.main.agent_runtime_arn
+        Condition = {
+          StringNotEquals = {
+            "aws:SourceVpc" = aws_vpc.main.id
+          }
+        }
+      }
+    ]
+  })
+}
+
 #------------------------------------------------------------------------------
 # CloudWatch Logs for AgentCore Runtime
 #------------------------------------------------------------------------------
