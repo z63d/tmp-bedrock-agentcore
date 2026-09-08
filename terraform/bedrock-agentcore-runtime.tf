@@ -186,7 +186,6 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
     GATEWAY_ID       = aws_bedrockagentcore_gateway.main.gateway_id
     EKS_CLUSTER_NAME = var.eks_cluster_name
     MYSQL_SECRET_ARN = var.mysql_secret_arn
-    PYTHONUNBUFFERED = "1"
   }
 
   lifecycle_configuration {
