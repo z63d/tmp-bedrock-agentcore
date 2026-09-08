@@ -111,8 +111,8 @@ resource "aws_secretsmanager_secret_version" "slack_signing_secret" {
 
 data "archive_file" "slack_bot" {
   type        = "zip"
-  source_dir  = "${path.module}/../app/lambda-slack-bot"
-  output_path = "${path.module}/../app/lambda-slack-bot/slack-bot.zip"
+  source_dir  = "${path.module}/../apps/lambda-slack-bot"
+  output_path = "${path.module}/../apps/lambda-slack-bot/slack-bot.zip"
   excludes = [
     "tsconfig.json",
     "package-lock.json",

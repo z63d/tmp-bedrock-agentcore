@@ -16,12 +16,12 @@ Terraform apply 前にビルド成果物を生成しておく必要がある。
 
 ```bash
 # Rollbar MCP Lambda (TypeScript)
-cd app/lambda-rollbar-mcp
+cd apps/lambda-rollbar-mcp
 npm install
 npm run build
 
 # Slack Bot Lambda (TypeScript)
-cd app/lambda-slack-bot
+cd apps/lambda-slack-bot
 npm install
 npm run build
 ```
@@ -106,7 +106,7 @@ aws bedrock-agentcore-control update-agent-runtime \
 ### Rollbar MCP Lambda
 
 ```bash
-cd app/lambda-rollbar-mcp
+cd apps/lambda-rollbar-mcp
 npm run build
 cd ../../terraform
 terraform apply
@@ -117,7 +117,7 @@ Terraform が ZIP を再生成して Lambda に自動アップロードする。
 ### Slack Bot Lambda
 
 ```bash
-cd app/lambda-slack-bot
+cd apps/lambda-slack-bot
 npm run build
 cd ../../terraform
 terraform apply
@@ -195,7 +195,7 @@ data: {"text":"Hello! How can I assist you today?","sessionId":"test-session-...
 ## ローカル開発
 
 ```bash
-cd app/bedrock-agentcore-sre
+cd apps/bedrock-agentcore-sre
 uv pip install --system -e ".[dev]"
 
 # AWS_REGION / BEDROCK_MODEL_ID 等を設定（.env でも可）
@@ -221,7 +221,7 @@ curl -X POST http://localhost:8080/invocations \
 Docker でコンテナとして動かす場合:
 
 ```bash
-cd app/bedrock-agentcore-sre
+cd apps/bedrock-agentcore-sre
 docker build -t bedrock-agent .
 
 docker run --rm \

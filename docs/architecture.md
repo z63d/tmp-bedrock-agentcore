@@ -10,7 +10,7 @@
 
 ## コンポーネント
 
-### AgentCore Runtime (`app/bedrock-agentcore-sre/`)
+### AgentCore Runtime (`apps/bedrock-agentcore-sre/`)
 
 **役割**: ユーザーリクエストを受け取り、Strands Agent が Bedrock モデルと MCP ツールを使って回答する。
 
