@@ -15,10 +15,12 @@ AWS が提示する [4 段階のネットワークパターン](https://aws.amaz
 
 ### 選定理由
 
-- EKS / RDS など **private subnet のリソースに直接アクセス** する要件がある（Pattern 2）
-- 外部 MCP サーバー (New Relic) へのアクセスが必要なため完全隔離 (Pattern 4) は不可
-- Resource policy (`aws:SourceVpc` Deny) で AgentCore Runtime をインターネットから完全に隔離（Pattern 3）
-- Runtime の VPC 接続は [AWS セキュリティベストプラクティス](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html#security-bp-network) でも推奨（private リソースアクセス + PrivateLink + VPC Flow Logs 監査）
+各 Pattern は前の Pattern の上に積み重なる構造（Pattern 3 = Pattern 2 + Resource Policy + PrivateLink）。
+
+- **Pattern 2（VPC 接続）**: EKS / RDS など private subnet のリソースに直接アクセスする要件がある。また Security Hub `BedrockAgentCore.1` が `networkMode=PUBLIC` を High severity で FAIL にするため、本番では VPC モードが事実上必須
+- **Pattern 3（+ Resource Policy + PrivateLink）**: Runtime へのインバウンドをインターネットからブロックしたい。`aws:SourceVpc` 条件の Deny + VPC Endpoint で VPC 内からのアクセスのみ許可
+- **Pattern 4 は不採用**: 外部 MCP サーバー (New Relic) へのアクセスが必要なため完全隔離は不可
+- VPC 接続の副次的メリット: [セキュリティベストプラクティス](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html#security-bp-network)が挙げる PrivateLink による通信の VPC 内閉じ込め、VPC Flow Logs によるネットワーク監査
 
 ### Pattern 3 の実装
 
