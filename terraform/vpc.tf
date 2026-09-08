@@ -128,9 +128,9 @@ resource "aws_security_group" "agentcore_runtime" {
   revoke_rules_on_delete = true
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -150,9 +150,9 @@ resource "aws_security_group" "slack_bot_lambda" {
   revoke_rules_on_delete = true
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
