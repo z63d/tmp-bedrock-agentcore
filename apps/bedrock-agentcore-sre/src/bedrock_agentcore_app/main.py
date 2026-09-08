@@ -32,7 +32,7 @@ from bedrock_agentcore_app.prompts import INVESTIGATION_SYSTEM_PROMPT, ORCHESTRA
 class MemoryClient:
     """Simple client for AgentCore Memory API."""
 
-    def __init__(self, region: str, memory_id: str, namespace: str) -> None:
+    def __init__(self, region: str, memory_id: str, namespace: str | None) -> None:
         self.region = region
         self.memory_id = memory_id
         self.namespace = namespace
@@ -45,6 +45,8 @@ class MemoryClient:
 
     async def search_memories(self, query: str, top_k: int = 3) -> list[dict[str, Any]]:
         """Search memories using vector similarity."""
+        if not self.namespace:
+            return []
         client = self._get_client()
         try:
             response = client.retrieve_memory_records(
@@ -134,10 +136,10 @@ logger = structlog.get_logger()
 # Configuration
 # =============================================================================
 
-region = os.environ.get("AWS_REGION", "ap-northeast-1")
+region = os.environ["AWS_REGION"]
 model_id = os.environ["BEDROCK_MODEL_ID"]
 memory_id = os.environ.get("MEMORY_ID")
-memory_namespace = os.environ.get("MEMORY_NAMESPACE", "/")
+memory_namespace = os.environ.get("MEMORY_NAMESPACE")
 gateway_id = os.environ.get("GATEWAY_ID")
 eks_cluster_name = os.environ.get("EKS_CLUSTER_NAME")
 mysql_secret_arn = os.environ.get("MYSQL_SECRET_ARN")
