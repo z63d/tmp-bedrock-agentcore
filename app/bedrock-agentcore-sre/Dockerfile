@@ -44,7 +44,9 @@ ENV OTEL_RESOURCE_ATTRIBUTES=service.name=bedrock-agentcore-app
 ENV OTEL_EXPORTER_OTLP_LOGS_HEADERS="x-aws-log-group=/aws/vendedlogs/bedrock-agentcore/bedrock-agentcore-ts,x-aws-log-stream=default,x-aws-metric-namespace=bedrock-agentcore"
 ENV AGENT_OBSERVABILITY_ENABLED=true
 
+RUN useradd -r -s /bin/false appuser
+USER appuser
+
 EXPOSE 8080
 
-# Run with OpenTelemetry instrumentation
 CMD ["opentelemetry-instrument", "python", "-m", "bedrock_agentcore_app.main"]
