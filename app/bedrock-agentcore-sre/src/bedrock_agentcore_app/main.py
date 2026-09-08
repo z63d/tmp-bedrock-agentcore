@@ -253,20 +253,21 @@ def create_orchestrator() -> Agent:
 @app.entrypoint
 async def invoke(payload: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
     """Handle agent invocation requests."""
-    prompt = payload.get("prompt", "")
+    prompt = payload.get("prompt")
     session_id = payload.get("sessionId") or str(uuid.uuid4())
+
+    # non-string prompt (list/dict) can inject toolUse blocks that bypass model inference
+    if not isinstance(prompt, str) or not prompt.strip():
+        logger.warning("Invalid or empty prompt", session_id=session_id, prompt_type=type(prompt).__name__)
+        yield {"error": "prompt must be a non-empty string", "sessionId": session_id}
+        return
 
     logger.info(
         "Received request",
         session_id=session_id,
         prompt_length=len(prompt),
-        prompt_preview=prompt[:100] if prompt else "",
+        prompt_preview=prompt[:100],
     )
-
-    if not prompt:
-        logger.warning("Empty prompt received", session_id=session_id)
-        yield {"error": "prompt is required", "sessionId": session_id}
-        return
 
     # Build context from AgentCore Memory (STM + LTM)
     context_parts: list[str] = []
