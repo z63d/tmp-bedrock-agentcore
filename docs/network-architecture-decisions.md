@@ -85,6 +85,33 @@ Pattern 3 の実装に必要な VPC Endpoint に加え、S3 Gateway Endpoint を
 
 - `bedrock-runtime` / `ecr` / `logs` 等は NAT GW 経由。本番化時にコスト最適化で追加を検討
 
+## Gateway Fronting（不採用）
+
+[AWS ベストプラクティス](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html)では、Runtime の前に Gateway を配置して Guardrails やリクエストインターセプターを適用するパターンを推奨している。現時点では不採用とした。
+
+### 不採用の理由
+
+- **Guardrails の必要性が低い**: SRE エージェントは社内利用（Slack 経由、許可チャンネル・ユーザー制限あり）。PII フィルタリングや有害コンテンツ検出の優先度が低い
+- **HTTP Runtime に Guardrails を適用するには OpenAPI schema が必要**: 現在の Runtime は HTTP protocol で、Gateway の Policy Engine を使うには schema 定義が追加で必要
+- **Interceptor が buffered mode のみ**: ストリーミングレスポンスに非対応。レスポンス時間に影響する
+- **既存 MCP Gateway は流用不可**: `protocol_type = "MCP"` の Gateway には Runtime target を追加できない。`protocol_type` 未設定の新 Gateway が別途必要
+- **変更範囲が大きい**: 新 Gateway + Target + Resource Policy 変更 + Slack Bot の呼び出し先変更 + IAM 変更 + VPC Endpoint 追加
+
+### 現在のアクセス制御
+
+Gateway fronting なしでも以下の多層防御で保護されている:
+
+- Resource Policy: `aws:SourceVpc` 条件で VPC 外からの全アクセスを Deny
+- Resource Policy: Slack Bot Lambda の IAM Role のみ Allow
+- Slack 署名検証 + チャンネル・ユーザー制限（アプリ層）
+- Runtime の IAM Role は最小権限（read-only ツールのみ）
+ 
+### 再検討の条件
+
+- 外部ユーザー（社外）にエージェントを公開する場合
+- PII を含むデータソース（顧客 DB 等）にアクセスする場合
+- プロンプトインジェクション対策が必要になった場合
+
 ## 参考
 
 - [Network connectivity patterns for agents deployed on Amazon Bedrock AgentCore Runtime](https://aws.amazon.com/blogs/networking-and-content-delivery/network-connectivity-patterns-for-agents-deployed-on-amazon-bedrock-agentcore-runtime/)
