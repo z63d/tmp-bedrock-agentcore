@@ -52,7 +52,7 @@ resource "aws_iam_role" "agentcore_runtime" {
             "aws:SourceAccount" = local.account_id
           }
           ArnLike = {
-            "aws:SourceArn" = "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:*"
+            "aws:SourceArn" = "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:runtime/*"
           }
         }
       }
