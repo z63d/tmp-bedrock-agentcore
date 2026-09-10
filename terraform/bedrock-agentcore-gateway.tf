@@ -51,7 +51,8 @@ resource "aws_iam_role_policy" "gateway" {
           "lambda:InvokeFunction"
         ]
         Resource = [
-          aws_lambda_function.rollbar_mcp.arn
+          aws_lambda_function.rollbar_mcp.arn,
+          aws_lambda_function.slack_ext_mcp.arn,
         ]
       },
       {
@@ -444,6 +445,215 @@ resource "aws_bedrockagentcore_gateway_target" "aws_mcp" {
   }
 
   depends_on = [aws_bedrockagentcore_gateway.main]
+}
+
+#------------------------------------------------------------------------------
+# Gateway Target - Slack Extended MCP Server (Canvas operations, Lambda)
+#------------------------------------------------------------------------------
+
+resource "aws_bedrockagentcore_gateway_target" "slack_ext_mcp" {
+  name               = "slack-ext-mcp-server"
+  gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
+  description        = "Slack Extended MCP Server - Canvas create/edit/delete/access operations"
+
+  credential_provider_configuration {
+    gateway_iam_role {}
+  }
+
+  target_configuration {
+    mcp {
+      lambda {
+        lambda_arn = aws_lambda_function.slack_ext_mcp.arn
+
+        tool_schema {
+          inline_payload {
+            name        = "canvas-create"
+            description = "Create a new standalone Slack canvas with optional markdown content"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "title"
+                type        = "string"
+                description = "Canvas title"
+                required    = false
+              }
+
+              property {
+                name        = "markdown"
+                type        = "string"
+                description = "Initial content in markdown format"
+                required    = false
+              }
+
+              property {
+                name        = "channel_id"
+                type        = "string"
+                description = "Channel ID to tab the canvas in"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "canvas-edit"
+            description = "Edit a Slack canvas (insert, replace, delete content or rename)"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "canvas_id"
+                type        = "string"
+                description = "Canvas ID (F-prefixed)"
+                required    = true
+              }
+
+              property {
+                name        = "operation"
+                type        = "string"
+                description = "Edit operation: insert_at_start, insert_at_end, insert_after, insert_before, replace, delete, rename"
+                required    = true
+              }
+
+              property {
+                name        = "markdown"
+                type        = "string"
+                description = "Content in markdown format (for insert/replace operations)"
+                required    = false
+              }
+
+              property {
+                name        = "section_id"
+                type        = "string"
+                description = "Target section ID (required for insert_after, insert_before, delete)"
+                required    = false
+              }
+
+              property {
+                name        = "title"
+                type        = "string"
+                description = "New title (for rename operation)"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "canvas-delete"
+            description = "Permanently delete a Slack canvas (cannot be undone)"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "canvas_id"
+                type        = "string"
+                description = "Canvas ID to delete"
+                required    = true
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "canvas-sections-lookup"
+            description = "Find sections in a canvas by type or text content"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "canvas_id"
+                type        = "string"
+                description = "Canvas ID"
+                required    = true
+              }
+
+              property {
+                name        = "criteria"
+                type        = "object"
+                description = "Search criteria with optional section_types (array) and contains_text (string)"
+                required    = true
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "canvas-access-set"
+            description = "Set access permissions on a canvas for channels or users"
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "canvas_id"
+                type        = "string"
+                description = "Canvas ID"
+                required    = true
+              }
+
+              property {
+                name        = "access_level"
+                type        = "string"
+                description = "Access level: read, write, or owner"
+                required    = true
+              }
+
+              property {
+                name        = "channel_ids"
+                type        = "string"
+                description = "Comma-separated channel IDs to grant access (mutually exclusive with user_ids)"
+                required    = false
+              }
+
+              property {
+                name        = "user_ids"
+                type        = "string"
+                description = "Comma-separated user IDs to grant access (mutually exclusive with channel_ids)"
+                required    = false
+              }
+            }
+          }
+
+          inline_payload {
+            name        = "channel-canvas-create"
+            description = "Create a channel canvas (resource hub). One per channel maximum."
+
+            input_schema {
+              type = "object"
+
+              property {
+                name        = "channel_id"
+                type        = "string"
+                description = "Channel ID"
+                required    = true
+              }
+
+              property {
+                name        = "title"
+                type        = "string"
+                description = "Canvas title"
+                required    = false
+              }
+
+              property {
+                name        = "markdown"
+                type        = "string"
+                description = "Initial content in markdown format"
+                required    = false
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  depends_on = [
+    aws_lambda_function.slack_ext_mcp,
+    aws_bedrockagentcore_gateway.main
+  ]
 }
 
 #------------------------------------------------------------------------------

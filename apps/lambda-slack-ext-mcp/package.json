@@ -1,0 +1,21 @@
+{
+  "name": "slack-ext-mcp-lambda",
+  "version": "1.0.0",
+  "description": "Slack Extended MCP Server for AWS Lambda (Canvas operations)",
+  "type": "module",
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.149",
+    "@types/node": "^24.13.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
