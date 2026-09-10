@@ -76,7 +76,7 @@ resource "aws_lambda_function" "slack_mcp" {
   runtime       = "provided.al2023"
   architectures = ["arm64"]
   memory_size   = 256
-  timeout       = 60
+  timeout       = 30
 
   source_code_hash = data.archive_file.slack_mcp.output_base64sha256
 
