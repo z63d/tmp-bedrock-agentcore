@@ -82,6 +82,15 @@ output "slack_bot_lambda_arn" {
 }
 
 #------------------------------------------------------------------------------
+# Slack MCP Server Outputs
+#------------------------------------------------------------------------------
+
+output "slack_mcp_function_url" {
+  description = "Function URL of the Slack MCP Lambda"
+  value       = aws_lambda_function_url.slack_mcp.function_url
+}
+
+#------------------------------------------------------------------------------
 # Google Workspace MCP Server Outputs
 #------------------------------------------------------------------------------
 

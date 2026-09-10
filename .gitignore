@@ -10,6 +10,7 @@ __pycache__/
 
 *.zip
 
-response.json
+# Go build artifacts
+apps/lambda-slack-mcp/mcp-server
 
 service-account-key.json

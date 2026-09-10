@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /var/task/mcp-server --transport http --no-cache

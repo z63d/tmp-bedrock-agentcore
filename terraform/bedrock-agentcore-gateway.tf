@@ -61,7 +61,8 @@ resource "aws_iam_role_policy" "gateway" {
           "lambda:InvokeFunctionUrl"
         ]
         Resource = [
-          aws_lambda_function.google_workspace_mcp.arn
+          aws_lambda_function.google_workspace_mcp.arn,
+          aws_lambda_function.slack_mcp.arn,
         ]
       },
       {
@@ -437,6 +438,34 @@ resource "aws_bedrockagentcore_gateway_target" "aws_mcp" {
     mcp {
       mcp_server {
         endpoint     = "https://aws-mcp.us-east-1.api.aws/mcp"
+        listing_mode = "DEFAULT"
+      }
+    }
+  }
+
+  depends_on = [aws_bedrockagentcore_gateway.main]
+}
+
+#------------------------------------------------------------------------------
+# Gateway Target - Slack MCP Server (remote MCP endpoint via Lambda Function URL)
+#------------------------------------------------------------------------------
+
+resource "aws_bedrockagentcore_gateway_target" "slack_mcp" {
+  name               = "slack-mcp-server"
+  gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
+  description        = "Slack MCP server (channels, messages, reactions, users, search) via Lambda"
+
+  credential_provider_configuration {
+    gateway_iam_role {
+      service = "lambda"
+      region  = var.aws_region
+    }
+  }
+
+  target_configuration {
+    mcp {
+      mcp_server {
+        endpoint     = "${aws_lambda_function_url.slack_mcp.function_url}mcp"
         listing_mode = "DEFAULT"
       }
     }

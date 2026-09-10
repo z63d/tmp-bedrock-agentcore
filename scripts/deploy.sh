@@ -14,11 +14,13 @@ Usage: $(basename "$0") <target>
 Targets:
   agent                Build and push AgentCore Runtime image
   google-workspace     Build and push Google Workspace MCP Lambda image
+  slack-mcp            Build and push Slack MCP Lambda image
   all                  Build and push all images
 
 Examples:
   $(basename "$0") agent
   $(basename "$0") google-workspace
+  $(basename "$0") slack-mcp
   $(basename "$0") all
 EOF
   exit 1
@@ -82,6 +84,27 @@ deploy_google_workspace() {
   update_lambda_image "k-bedrock-agentcore-google-workspace-mcp" "$ecr_url"
 }
 
+deploy_slack_mcp() {
+  local app_dir="$REPO_ROOT/apps/lambda-slack-mcp"
+  local build_dir="$app_dir/.build"
+
+  echo "=== Building Slack MCP (Go cross-compile) ==="
+  rm -rf "$build_dir"
+  mkdir -p "$build_dir"
+
+  git clone --depth 1 https://github.com/korotovsky/slack-mcp-server.git "$build_dir/src"
+  cd "$build_dir/src"
+  CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o "$app_dir/mcp-server" ./cmd/slack-mcp-server
+  cd "$REPO_ROOT"
+
+  chmod +x "$app_dir/mcp-server"
+  rm -rf "$build_dir"
+
+  echo "Built: $app_dir/mcp-server"
+  echo "Run 'cd terraform && terraform apply' to deploy."
+  echo ""
+}
+
 [[ $# -lt 1 ]] && usage
 
 case "$1" in
@@ -91,9 +114,13 @@ case "$1" in
   google-workspace)
     deploy_google_workspace
     ;;
+  slack-mcp)
+    deploy_slack_mcp
+    ;;
   all)
     deploy_agent
     deploy_google_workspace
+    deploy_slack_mcp
     ;;
   *)
     echo "Unknown target: $1"
