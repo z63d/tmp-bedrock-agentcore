@@ -80,3 +80,17 @@ output "slack_bot_lambda_arn" {
   description = "ARN of the Slack Bot Lambda function"
   value       = aws_lambda_function.slack_bot.arn
 }
+
+#------------------------------------------------------------------------------
+# Google Workspace MCP Server Outputs
+#------------------------------------------------------------------------------
+
+output "google_workspace_mcp_ecr_url" {
+  description = "URL of the Google Workspace MCP ECR repository"
+  value       = aws_ecr_repository.google_workspace_mcp.repository_url
+}
+
+output "google_workspace_mcp_function_url" {
+  description = "Function URL of the Google Workspace MCP Lambda"
+  value       = aws_lambda_function_url.google_workspace_mcp.function_url
+}

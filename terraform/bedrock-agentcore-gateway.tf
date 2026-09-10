@@ -55,6 +55,16 @@ resource "aws_iam_role_policy" "gateway" {
         ]
       },
       {
+        Sid    = "InvokeFunctionUrl"
+        Effect = "Allow"
+        Action = [
+          "lambda:InvokeFunctionUrl"
+        ]
+        Resource = [
+          aws_lambda_function.google_workspace_mcp.arn
+        ]
+      },
+      {
         Sid    = "GetWorkloadAccessToken"
         Effect = "Allow"
         Action = [
@@ -427,6 +437,34 @@ resource "aws_bedrockagentcore_gateway_target" "aws_mcp" {
     mcp {
       mcp_server {
         endpoint     = "https://aws-mcp.us-east-1.api.aws/mcp"
+        listing_mode = "DEFAULT"
+      }
+    }
+  }
+
+  depends_on = [aws_bedrockagentcore_gateway.main]
+}
+
+#------------------------------------------------------------------------------
+# Gateway Target - Google Workspace MCP Server (remote MCP endpoint via Lambda Function URL)
+#------------------------------------------------------------------------------
+
+resource "aws_bedrockagentcore_gateway_target" "google_workspace_mcp" {
+  name               = "google-workspace-mcp-server"
+  gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
+  description        = "Google Workspace MCP server (Drive, Docs, Sheets, Slides) via Lambda"
+
+  credential_provider_configuration {
+    gateway_iam_role {
+      service = "lambda"
+      region  = var.aws_region
+    }
+  }
+
+  target_configuration {
+    mcp {
+      mcp_server {
+        endpoint     = "${aws_lambda_function_url.google_workspace_mcp.function_url}mcp"
         listing_mode = "DEFAULT"
       }
     }

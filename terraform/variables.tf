@@ -91,6 +91,27 @@ variable "allowed_slack_user_ids" {
   default     = []
 }
 
+#------------------------------------------------------------------------------
+# Google Workspace MCP Server Variables
+#------------------------------------------------------------------------------
+
+variable "google_cloud_service_account_key_path" {
+  description = "Path to Google Cloud Service Account key JSON file for Google Workspace MCP. TODO: Migrate to Workload Identity Federation."
+  type        = string
+}
+
+variable "google_workspace_mcp_lambda_memory" {
+  description = "Memory size for Google Workspace MCP Lambda in MB"
+  type        = number
+  default     = 512
+}
+
+variable "google_workspace_mcp_lambda_timeout" {
+  description = "Timeout for Google Workspace MCP Lambda in seconds"
+  type        = number
+  default     = 60
+}
+
 variable "slack_bot_lambda_memory" {
   description = "Memory size for Slack Bot Lambda in MB"
   type        = number

@@ -239,7 +239,7 @@ def create_orchestrator() -> Agent:
         tools=[
             investigation_agent.as_tool(
                 name="investigation_agent",
-                description="SRE investigation specialist. Delegates infrastructure monitoring, log analysis, metric queries, error tracking, Kubernetes cluster inspection, MySQL database queries, and incident investigation tasks. Has access to New Relic, AWS CloudWatch, Rollbar tools via MCP Gateway, Kubernetes tools for EKS, and MySQL read-only query tools.",
+                description="SRE investigation specialist with access to various tools via MCP Gateway (monitoring, error tracking, cloud infrastructure, databases, document management, etc), Kubernetes tools for EKS, and MySQL read-only query tools. Delegates any investigation, monitoring, or operational task.",
             ),
         ],
         plugins=[AgentSkills(skills=["./skills/report"])],
