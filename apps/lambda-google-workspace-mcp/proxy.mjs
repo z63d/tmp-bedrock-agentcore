@@ -1,6 +1,23 @@
-// Proxy that intercepts server/discover (MCP 2026-07-28) which the MCP SDK 1.x doesn't support.
-// Responds with a minimal discovery payload so the Gateway can proceed.
-// All other requests are forwarded to the actual MCP server.
+// MCP Protocol Compatibility Proxy
+//
+// AgentCore Gateway (2026-07-28) と MCP SDK 1.x (2025-03-26) の
+// プロトコルバージョン差を吸収するプロキシ。
+//
+// 背景:
+//   AgentCore Gateway は MCP 2026-07-28 のメソッド (server/discover 等) を送るが、
+//   piotr-agier/google-drive-mcp が依存する @modelcontextprotocol/sdk 1.x は
+//   2025-03-26 までしかサポートしていない。未知のメソッドに対して SDK は
+//   "Method not found" を返し、Gateway はこれを致命的エラーとして target 作成に失敗する。
+//
+// 方針:
+//   - server/discover: initialize + tools/list を内部で実行し、合成レスポンスを返す
+//   - resources/templates/list: SDK 未登録のため空リストを返す
+//   - その他: MCP サーバーにそのまま透過フォワード
+//
+// 構成:
+//   [Lambda Web Adapter] :8080 → [proxy.mjs] :8080 → [google-drive-mcp] :8081
+//
+// MCP SDK が 2026-07-28 をサポートしたらこのプロキシは不要になる。
 
 import http from "node:http";
 
@@ -29,8 +46,9 @@ function forwardRequest(req, res, body) {
   proxyReq.end(body);
 }
 
+// server/discover (MCP 2026-07-28):
+// initialize + tools/list を実行し、結果をマージして返す
 function handleDiscover(parsedBody, res) {
-  // First, get server info via initialize
   const initPayload = JSON.stringify({
     jsonrpc: "2.0",
     id: "_discover_init",
@@ -49,7 +67,6 @@ function handleDiscover(parsedBody, res) {
       initRes.on("data", (chunk) => (data += chunk));
       initRes.on("end", () => {
         try {
-          // Parse SSE or JSON response
           let initResult;
           if (data.includes("event: message")) {
             const match = data.match(/^data: (.+)$/m);
@@ -59,7 +76,6 @@ function handleDiscover(parsedBody, res) {
           }
           const sessionId = initRes.headers["mcp-session-id"];
 
-          // Now get tools
           const toolsPayload = JSON.stringify({ jsonrpc: "2.0", id: "_discover_tools", method: "tools/list", params: {} });
           const toolsHeaders = { "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
           if (sessionId) toolsHeaders["mcp-session-id"] = sessionId;
@@ -78,14 +94,12 @@ function handleDiscover(parsedBody, res) {
                   toolsResult = JSON.parse(toolsData).result || { tools: [] };
                 }
 
-                // Close session
                 if (sessionId) {
                   const delReq = http.request({ ...TARGET, path: "/mcp", method: "DELETE", headers: { "mcp-session-id": sessionId } });
                   delReq.on("error", () => {});
                   delReq.end();
                 }
 
-                // Respond with discover result
                 const discoverResponse = {
                   jsonrpc: "2.0",
                   id: parsedBody.id,
