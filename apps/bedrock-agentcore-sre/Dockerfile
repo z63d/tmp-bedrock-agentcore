@@ -1,41 +1,28 @@
-# ===============================
-# Stage 1: Builder
-# ===============================
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
+FROM python:3.13-slim-bookworm AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:0.11.24 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# Copy dependency files
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
 
-# Install dependencies with uv
-RUN uv pip install --system --no-cache .
+RUN uv sync --frozen --no-dev --no-editable
 
-# Copy source code and skills
 COPY src/ ./src/
 COPY skills/ ./skills/
 
-# ===============================
-# Stage 2: Runtime
-# ===============================
 FROM python:3.13-slim-bookworm AS runtime
 
 WORKDIR /app
 
-# Copy installed packages from builder
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-
-# Copy application code and skills
+COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/skills ./skills
 
-# Set environment variables
+ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app/src
-
-ENV AGENT_OBSERVABILITY_ENABLED=true
 
 RUN useradd -r -s /bin/false appuser
 USER appuser
