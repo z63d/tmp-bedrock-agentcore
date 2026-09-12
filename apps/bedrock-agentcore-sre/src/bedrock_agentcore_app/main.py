@@ -224,19 +224,19 @@ async def invoke(payload: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
 
     agent = _create_orchestrator()
 
+    # HealthyBusy prevents idleRuntimeSessionTimeout from killing the session
+    # while the agent is running (platform request timeout is 15min)
+    # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/bedrock-agentcore-limits.html#runtime-service-limits
+    # SDK auto-returns HealthyBusy when _active_tasks is non-empty; @app.ping not needed
+    task_id = app.add_async_task("agent_invoke", {"session_id": session_id})
     try:
-        # agent() is sync (blocks until all tool calls finish); 120s cap prevents runaway loops
-        result = await asyncio.wait_for(asyncio.to_thread(agent, context_prompt), timeout=120)
+        result = await asyncio.to_thread(agent, context_prompt)
         response_text = str(result)
 
         if memory_client:
             await memory_client.store_conversation(session_id, prompt, response_text)
 
         yield {"text": response_text, "sessionId": session_id}
-
-    except TimeoutError:
-        logger.error("Agent invoke timed out", session_id=session_id)
-        yield {"error": "Request timed out.", "sessionId": session_id}
 
     except Exception as error:
         logger.error(
@@ -246,6 +246,9 @@ async def invoke(payload: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
             error_type=type(error).__name__,
         )
         yield {"error": "An internal error occurred.", "sessionId": session_id}
+
+    finally:
+        app.complete_async_task(task_id)
 
 
 def main() -> None:
