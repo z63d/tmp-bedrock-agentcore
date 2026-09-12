@@ -122,7 +122,7 @@ data "archive_file" "slack_bot" {
 }
 
 #------------------------------------------------------------------------------
-# Lambda Function
+# Lambda
 #------------------------------------------------------------------------------
 
 resource "aws_lambda_function" "slack_bot" {
@@ -136,8 +136,8 @@ resource "aws_lambda_function" "slack_bot" {
   runtime          = "nodejs24.x"
   architectures    = ["arm64"]
 
-  memory_size = var.slack_bot_lambda_memory
-  timeout     = var.slack_bot_lambda_timeout
+  memory_size = 128
+  timeout     = 900
 
   environment {
     variables = {
@@ -158,9 +158,11 @@ resource "aws_lambda_function" "slack_bot" {
   depends_on = [aws_iam_role_policy.slack_bot_lambda]
 }
 
-#------------------------------------------------------------------------------
-# Function URL (HTTPS endpoint for Slack Events API)
-#------------------------------------------------------------------------------
+# Disable async invoke retries (self-invoke pattern; retry causes duplicate messages)
+resource "aws_lambda_function_event_invoke_config" "slack_bot" {
+  function_name          = aws_lambda_function.slack_bot.function_name
+  maximum_retry_attempts = 0
+}
 
 resource "aws_lambda_function_url" "slack_bot" {
   function_name      = aws_lambda_function.slack_bot.function_name

@@ -78,21 +78,38 @@ async function invokeAgent(text: string, sessionId: string): Promise<string> {
 
   if (!response.response) throw new Error("No response from AgentCore");
 
-  const raw = await response.response.transformToString();
+  // Read SSE stream chunk-by-chunk instead of transformToString() which
+  // can hang waiting for the connection to close
+  const reader = response.response.transformToWebStream().getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
   const results: string[] = [];
 
-  for (const line of raw.split("\n")) {
-    if (line.startsWith("data: ")) {
-      try {
-        const data = JSON.parse(line.slice(6));
-        if (data.text) results.push(data.text);
-      } catch {
-        results.push(line.slice(6));
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    let newlineIdx: number;
+    while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, newlineIdx).trimEnd();
+      buffer = buffer.slice(newlineIdx + 1);
+
+      if (line.startsWith("data: ")) {
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.text) results.push(data.text);
+          if (data.error) results.push(data.error);
+        } catch {
+          results.push(line.slice(6));
+        }
       }
     }
   }
 
-  return results.join("\n") || raw;
+  if (!results.length) throw new Error("No response data from AgentCore");
+  return results.join("\n");
 }
 
 function truncate(text: string, limit = 3900): string {
@@ -113,26 +130,41 @@ interface AsyncPayload {
 async function processAsync(payload: AsyncPayload): Promise<void> {
   const { channel, threadTs, messageTs, text } = payload;
 
-  if (messageTs === threadTs) {
-    await slack.reactions.add({ channel, timestamp: messageTs, name: "eyes" });
-  }
+  const pending = await slack.chat.postMessage({
+    channel,
+    text: ":loading: Processing...",
+    thread_ts: threadTs,
+  });
 
+  const startTime = Date.now();
+  const timer = setInterval(async () => {
+    const sec = Math.floor((Date.now() - startTime) / 1000);
+    const label = sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}m${sec % 60}s`;
+    await slack.chat.update({
+      channel,
+      ts: pending.ts!,
+      text: `:loading: Processing... (${label})`,
+    }).catch(() => {});
+  }, 10_000);
+ 
   const sessionId = `slack-${channel}-${threadTs.replace(".", "")}`;
 
   try {
     const result = await invokeAgent(text, sessionId);
-    await slack.chat.postMessage({
+    clearInterval(timer);
+    await slack.chat.update({
       channel,
+      ts: pending.ts!,
       text: truncate(result),
-      thread_ts: threadTs,
     });
   } catch (error) {
+    clearInterval(timer);
     console.error("AgentCore invocation failed:", error);
     const message = error instanceof Error ? error.message : String(error);
-    await slack.chat.postMessage({
+    await slack.chat.update({
       channel,
-      text: `:x: エラーが発生しました: ${message}`,
-      thread_ts: threadTs,
+      ts: pending.ts!,
+      text: truncate(`:x: Error: ${message}`),
     });
   }
 }

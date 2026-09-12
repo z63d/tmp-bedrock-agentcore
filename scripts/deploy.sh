@@ -14,13 +14,13 @@ Usage: $(basename "$0") <target>
 Targets:
   agent                Build and push AgentCore Runtime image
   google-workspace     Build and push Google Workspace MCP Lambda image
-  slack-mcp            Build and push Slack MCP Lambda image
-  all                  Build and push all images
+  slack-mcp            Build Slack MCP Go binary (then terraform apply)
+  slack-bot            Build Slack Bot + Slack Ext MCP (then terraform apply)
+  all                  Build and push all
 
 Examples:
   $(basename "$0") agent
-  $(basename "$0") google-workspace
-  $(basename "$0") slack-mcp
+  $(basename "$0") slack-bot
   $(basename "$0") all
 EOF
   exit 1
@@ -105,6 +105,22 @@ deploy_slack_mcp() {
   echo ""
 }
 
+deploy_slack_bot() {
+  echo "=== Building lambda-slack-bot ==="
+  cd "$REPO_ROOT/apps/lambda-slack-bot"
+  npm install
+  npm run build
+
+  echo "=== Building lambda-slack-ext-mcp ==="
+  cd "$REPO_ROOT/apps/lambda-slack-ext-mcp"
+  npm install
+  npm run build
+
+  cd "$REPO_ROOT"
+  echo "Build complete. Run 'cd terraform && terraform apply' to deploy."
+  echo ""
+}
+
 [[ $# -lt 1 ]] && usage
 
 case "$1" in
@@ -117,10 +133,14 @@ case "$1" in
   slack-mcp)
     deploy_slack_mcp
     ;;
+  slack-bot)
+    deploy_slack_bot
+    ;;
   all)
     deploy_agent
     deploy_google_workspace
     deploy_slack_mcp
+    deploy_slack_bot
     ;;
   *)
     echo "Unknown target: $1"

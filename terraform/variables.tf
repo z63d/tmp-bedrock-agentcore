@@ -111,15 +111,3 @@ variable "google_workspace_mcp_lambda_timeout" {
   type        = number
   default     = 60
 }
-
-variable "slack_bot_lambda_memory" {
-  description = "Memory size for Slack Bot Lambda in MB"
-  type        = number
-  default     = 256
-}
-
-variable "slack_bot_lambda_timeout" {
-  description = "Timeout for Slack Bot Lambda in seconds"
-  type        = number
-  default     = 120
-}
