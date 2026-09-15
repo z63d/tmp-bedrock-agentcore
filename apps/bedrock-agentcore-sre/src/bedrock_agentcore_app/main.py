@@ -181,6 +181,26 @@ def _get_investigation_agent() -> Agent:
 def _create_orchestrator() -> Agent:
     investigation_agent = _get_investigation_agent()
 
+    orchestrator_tools: list[Any] = [
+        investigation_agent.as_tool(
+            name="investigation_agent",
+            description="SRE investigation specialist for deep, multi-step investigations that require correlating data across multiple sources. Delegates heavy investigation tasks and returns summarized findings. Use when the task requires extensive analysis, root cause investigation, or correlating data across many services/time ranges.",
+        ),
+    ]
+
+    if mcp_client:
+        orchestrator_tools.append(mcp_client)
+
+    if eks_cluster_name:
+        from bedrock_agentcore_app.tools.k8s import k8s_tools
+
+        orchestrator_tools.extend(k8s_tools)
+
+    if mysql_secret_arn:
+        from bedrock_agentcore_app.tools.mysql import mysql_tools
+
+        orchestrator_tools.extend(mysql_tools)
+
     return Agent(
         model=BedrockModel(
             region_name=region,
@@ -188,12 +208,7 @@ def _create_orchestrator() -> Agent:
             max_tokens=4096,
             cache_config=CacheConfig(strategy="auto"),
         ),
-        tools=[
-            investigation_agent.as_tool(
-                name="investigation_agent",
-                description="SRE investigation specialist with access to various tools via MCP Gateway (monitoring, error tracking, cloud infrastructure, databases, document management, etc), Kubernetes tools for EKS, and MySQL read-only query tools. Delegates any investigation, monitoring, or operational task.",
-            ),
-        ],
+        tools=orchestrator_tools,
         plugins=[AgentSkills(skills=["./skills/report"])],
         system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
     )
