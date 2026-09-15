@@ -99,6 +99,30 @@ resource "aws_iam_role_policy" "gateway" {
         Resource = [
           aws_bedrockagentcore_api_key_credential_provider.newrelic.api_key_secret_arn[0].secret_arn
         ]
+      },
+      # Wildcard to avoid circular dependency: this IAM policy must be
+      # created before the Gateway, so we cannot reference gateway_arn here.
+      {
+        Sid    = "PolicyEngineConfiguration"
+        Effect = "Allow"
+        Action = [
+          "bedrock-agentcore:GetPolicyEngine"
+        ]
+        Resource = [
+          "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:policy-engine/*"
+        ]
+      },
+      {
+        Sid    = "PolicyEngineAuthorization"
+        Effect = "Allow"
+        Action = [
+          "bedrock-agentcore:AuthorizeAction",
+          "bedrock-agentcore:PartiallyAuthorizeActions"
+        ]
+        Resource = [
+          "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:policy-engine/*",
+          "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:gateway/*"
+        ]
       }
     ]
   })
@@ -129,6 +153,11 @@ resource "aws_bedrockagentcore_gateway" "main" {
       instructions       = "MCP Gateway providing various tools for AWS operations and observability."
       supported_versions = ["2025-03-26"]
     }
+  }
+
+  policy_engine_configuration {
+    arn  = aws_bedrockagentcore_policy_engine.main.policy_engine_arn
+    mode = "ENFORCE"
   }
 
   description = "AgentCore MCP Gateway for tool integrations"
