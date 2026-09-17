@@ -64,6 +64,16 @@ variable "newrelic_api_key" {
 }
 
 #------------------------------------------------------------------------------
+# GitHub MCP Server Variables
+#------------------------------------------------------------------------------
+
+variable "github_pat" {
+  description = "GitHub PAT (e.g. 'ghp_xxxxx'). 'Bearer ' prefix is added automatically. Used for Gateway outbound auth to the official GitHub MCP server."
+  type        = string
+  sensitive   = true
+}
+
+#------------------------------------------------------------------------------
 # Slack Bot Variables
 #------------------------------------------------------------------------------
 

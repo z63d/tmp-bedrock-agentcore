@@ -87,7 +87,8 @@ resource "aws_iam_role_policy" "gateway" {
           "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:workload-identity-directory/default",
           "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:workload-identity-directory/default/workload-identity/${var.project_name}-*",
           "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:token-vault/default",
-          aws_bedrockagentcore_api_key_credential_provider.newrelic.credential_provider_arn
+          aws_bedrockagentcore_api_key_credential_provider.newrelic.credential_provider_arn,
+          aws_bedrockagentcore_api_key_credential_provider.github.credential_provider_arn
         ]
       },
       {
@@ -97,7 +98,8 @@ resource "aws_iam_role_policy" "gateway" {
           "secretsmanager:GetSecretValue"
         ]
         Resource = [
-          aws_bedrockagentcore_api_key_credential_provider.newrelic.api_key_secret_arn[0].secret_arn
+          aws_bedrockagentcore_api_key_credential_provider.newrelic.api_key_secret_arn[0].secret_arn,
+          aws_bedrockagentcore_api_key_credential_provider.github.api_key_secret_arn[0].secret_arn
         ]
       },
       # Wildcard to avoid circular dependency: this IAM policy must be
@@ -468,6 +470,35 @@ resource "aws_bedrockagentcore_gateway_target" "aws_mcp" {
     mcp {
       mcp_server {
         endpoint     = "https://aws-mcp.us-east-1.api.aws/mcp"
+        listing_mode = "DEFAULT"
+      }
+    }
+  }
+
+  depends_on = [aws_bedrockagentcore_gateway.main]
+}
+
+#------------------------------------------------------------------------------
+# Gateway Target - GitHub MCP Server (official remote MCP endpoint)
+#------------------------------------------------------------------------------
+
+resource "aws_bedrockagentcore_gateway_target" "github_mcp" {
+  name               = "github-mcp-server"
+  gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
+  description        = "GitHub official remote MCP server for repos, issues, PRs, code search"
+
+  credential_provider_configuration {
+    api_key {
+      provider_arn              = aws_bedrockagentcore_api_key_credential_provider.github.credential_provider_arn
+      credential_location       = "HEADER"
+      credential_parameter_name = "Authorization"
+    }
+  }
+
+  target_configuration {
+    mcp {
+      mcp_server {
+        endpoint     = "https://api.githubcopilot.com/mcp/"
         listing_mode = "DEFAULT"
       }
     }
