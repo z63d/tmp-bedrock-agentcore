@@ -11,6 +11,8 @@ from typing import Any, AsyncIterator
 import boto3
 import structlog
 from bedrock_agentcore import BedrockAgentCoreApp
+from mcp import types as mcp_types
+from mcp.client.session import ClientSession
 from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
 from strands import Agent, AgentSkills
 from strands.models import BedrockModel
@@ -18,6 +20,23 @@ from strands.models.bedrock import CacheConfig
 from strands.tools.mcp import MCPClient
 
 from bedrock_agentcore_app.prompts import INVESTIGATION_SYSTEM_PROMPT, ORCHESTRATOR_SYSTEM_PROMPT
+
+# Upstream servers like GitHub MCP (v2+) declare outputSchema only for MCP 2026-07-28.
+# AgentCore Gateway forwards that outputSchema to older-protocol clients but drops
+# structuredContent, which ClientSession rejects. Skip validation only when
+# structuredContent is absent (text content is still returned).
+_original_validate_tool_result = ClientSession._validate_tool_result
+
+
+async def _validate_tool_result_if_structured(
+    self: ClientSession, name: str, result: mcp_types.CallToolResult
+) -> None:
+    if result.structuredContent is None:
+        return
+    await _original_validate_tool_result(self, name, result)
+
+
+ClientSession._validate_tool_result = _validate_tool_result_if_structured  # type: ignore[method-assign]
 
 
 class MemoryClient:

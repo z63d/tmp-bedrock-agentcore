@@ -156,7 +156,7 @@ resource "aws_bedrockagentcore_gateway" "main" {
   protocol_configuration {
     mcp {
       instructions       = "MCP Gateway providing various tools for AWS operations and observability."
-      supported_versions = ["2025-03-26"]
+      supported_versions = ["2025-03-26", "2025-06-18", "2025-11-25"]
     }
   }
 
