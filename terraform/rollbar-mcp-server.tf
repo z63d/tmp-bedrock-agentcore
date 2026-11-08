@@ -7,6 +7,7 @@
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_api_key_credential_provider" "rollbar" {
+  count              = var.enable_rollbar_mcp ? 1 : 0
   name               = "rollbar-api-key"
   api_key_wo         = var.rollbar_access_token
   api_key_wo_version = 1
@@ -17,7 +18,8 @@ resource "aws_bedrockagentcore_api_key_credential_provider" "rollbar" {
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_workload_identity" "rollbar_mcp" {
-  name = "${var.project_name}-rollbar-mcp"
+  count = var.enable_rollbar_mcp ? 1 : 0
+  name  = "${var.project_name}-rollbar-mcp"
 }
 
 #------------------------------------------------------------------------------
@@ -25,6 +27,7 @@ resource "aws_bedrockagentcore_workload_identity" "rollbar_mcp" {
 #------------------------------------------------------------------------------
 
 data "archive_file" "rollbar_mcp" {
+  count       = var.enable_rollbar_mcp ? 1 : 0
   type        = "zip"
   source_dir  = "${path.module}/../apps/lambda-rollbar-mcp"
   output_path = "${path.module}/../apps/lambda-rollbar-mcp/rollbar-mcp.zip"
@@ -45,7 +48,8 @@ data "archive_file" "rollbar_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_iam_role" "rollbar_mcp_lambda" {
-  name = "${var.project_name}-rollbar-mcp-lambda"
+  count = var.enable_rollbar_mcp ? 1 : 0
+  name  = "${var.project_name}-rollbar-mcp-lambda"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -62,8 +66,9 @@ resource "aws_iam_role" "rollbar_mcp_lambda" {
 }
 
 resource "aws_iam_role_policy" "rollbar_mcp_lambda" {
-  name = "${var.project_name}-rollbar-mcp-policy"
-  role = aws_iam_role.rollbar_mcp_lambda.id
+  count = var.enable_rollbar_mcp ? 1 : 0
+  name  = "${var.project_name}-rollbar-mcp-policy"
+  role  = aws_iam_role.rollbar_mcp_lambda[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -87,7 +92,7 @@ resource "aws_iam_role_policy" "rollbar_mcp_lambda" {
         ]
         Resource = [
           "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:workload-identity-directory/default",
-          aws_bedrockagentcore_workload_identity.rollbar_mcp.workload_identity_arn
+          aws_bedrockagentcore_workload_identity.rollbar_mcp[0].workload_identity_arn
         ]
       },
       {
@@ -98,9 +103,9 @@ resource "aws_iam_role_policy" "rollbar_mcp_lambda" {
         ]
         Resource = [
           "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:workload-identity-directory/default",
-          aws_bedrockagentcore_workload_identity.rollbar_mcp.workload_identity_arn,
+          aws_bedrockagentcore_workload_identity.rollbar_mcp[0].workload_identity_arn,
           "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:token-vault/default",
-          aws_bedrockagentcore_api_key_credential_provider.rollbar.credential_provider_arn
+          aws_bedrockagentcore_api_key_credential_provider.rollbar[0].credential_provider_arn
         ]
       },
       {
@@ -109,7 +114,7 @@ resource "aws_iam_role_policy" "rollbar_mcp_lambda" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = aws_bedrockagentcore_api_key_credential_provider.rollbar.api_key_secret_arn[0].secret_arn
+        Resource = aws_bedrockagentcore_api_key_credential_provider.rollbar[0].api_key_secret_arn[0].secret_arn
       }
     ]
   })
@@ -120,12 +125,13 @@ resource "aws_iam_role_policy" "rollbar_mcp_lambda" {
 #------------------------------------------------------------------------------
 
 resource "aws_lambda_function" "rollbar_mcp" {
+  count         = var.enable_rollbar_mcp ? 1 : 0
   function_name = "${var.project_name}-rollbar-mcp"
-  role          = aws_iam_role.rollbar_mcp_lambda.arn
+  role          = aws_iam_role.rollbar_mcp_lambda[0].arn
 
   package_type     = "Zip"
-  filename         = data.archive_file.rollbar_mcp.output_path
-  source_code_hash = data.archive_file.rollbar_mcp.output_base64sha256
+  filename         = data.archive_file.rollbar_mcp[0].output_path
+  source_code_hash = data.archive_file.rollbar_mcp[0].output_base64sha256
   handler          = "dist/handler.handler"
   runtime          = "nodejs24.x"
   architectures    = ["arm64"]
@@ -136,8 +142,8 @@ resource "aws_lambda_function" "rollbar_mcp" {
   environment {
     variables = {
       AWS_REGION_NAME                  = var.aws_region
-      WORKLOAD_IDENTITY_NAME           = aws_bedrockagentcore_workload_identity.rollbar_mcp.name
-      API_KEY_CREDENTIAL_PROVIDER_NAME = aws_bedrockagentcore_api_key_credential_provider.rollbar.name
+      WORKLOAD_IDENTITY_NAME           = aws_bedrockagentcore_workload_identity.rollbar_mcp[0].name
+      API_KEY_CREDENTIAL_PROVIDER_NAME = aws_bedrockagentcore_api_key_credential_provider.rollbar[0].name
     }
   }
 
@@ -149,6 +155,7 @@ resource "aws_lambda_function" "rollbar_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_cloudwatch_log_group" "rollbar_mcp" {
-  name              = "/aws/lambda/${aws_lambda_function.rollbar_mcp.function_name}"
+  count             = var.enable_rollbar_mcp ? 1 : 0
+  name              = "/aws/lambda/${aws_lambda_function.rollbar_mcp[0].function_name}"
   retention_in_days = 3
 }

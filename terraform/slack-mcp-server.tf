@@ -12,7 +12,8 @@
 #------------------------------------------------------------------------------
 
 resource "aws_iam_role" "slack_mcp_lambda" {
-  name = "${var.project_name}-slack-mcp-lambda"
+  count = var.enable_slack_mcp ? 1 : 0
+  name  = "${var.project_name}-slack-mcp-lambda"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -29,8 +30,9 @@ resource "aws_iam_role" "slack_mcp_lambda" {
 }
 
 resource "aws_iam_role_policy" "slack_mcp_lambda" {
-  name = "${var.project_name}-slack-mcp-policy"
-  role = aws_iam_role.slack_mcp_lambda.id
+  count = var.enable_slack_mcp ? 1 : 0
+  name  = "${var.project_name}-slack-mcp-policy"
+  role  = aws_iam_role.slack_mcp_lambda[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -54,6 +56,7 @@ resource "aws_iam_role_policy" "slack_mcp_lambda" {
 #------------------------------------------------------------------------------
 
 data "archive_file" "slack_mcp" {
+  count       = var.enable_slack_mcp ? 1 : 0
   type        = "zip"
   source_dir  = "${path.module}/../apps/lambda-slack-mcp"
   output_path = "${path.module}/../apps/lambda-slack-mcp/lambda.zip"
@@ -68,17 +71,18 @@ data "archive_file" "slack_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_lambda_function" "slack_mcp" {
+  count         = var.enable_slack_mcp ? 1 : 0
   function_name = "${var.project_name}-slack-mcp"
-  role          = aws_iam_role.slack_mcp_lambda.arn
+  role          = aws_iam_role.slack_mcp_lambda[0].arn
   package_type  = "Zip"
-  filename      = data.archive_file.slack_mcp.output_path
+  filename      = data.archive_file.slack_mcp[0].output_path
   handler       = "bootstrap"
   runtime       = "provided.al2023"
   architectures = ["arm64"]
   memory_size   = 256
   timeout       = 30
 
-  source_code_hash = data.archive_file.slack_mcp.output_base64sha256
+  source_code_hash = data.archive_file.slack_mcp[0].output_base64sha256
 
   layers = [
     "arn:aws:lambda:${var.aws_region}:753240598075:layer:LambdaAdapterLayerArm64:28"
@@ -111,15 +115,17 @@ resource "aws_lambda_function" "slack_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_lambda_function_url" "slack_mcp" {
-  function_name      = aws_lambda_function.slack_mcp.function_name
+  count              = var.enable_slack_mcp ? 1 : 0
+  function_name      = aws_lambda_function.slack_mcp[0].function_name
   authorization_type = "AWS_IAM"
   invoke_mode        = "BUFFERED"
 }
 
 resource "aws_lambda_permission" "slack_mcp_function_url" {
+  count                  = var.enable_slack_mcp ? 1 : 0
   statement_id           = "AllowGatewayFunctionUrl"
   action                 = "lambda:InvokeFunctionUrl"
-  function_name          = aws_lambda_function.slack_mcp.function_name
+  function_name          = aws_lambda_function.slack_mcp[0].function_name
   principal              = aws_iam_role.gateway.arn
   function_url_auth_type = "AWS_IAM"
 }
@@ -129,6 +135,7 @@ resource "aws_lambda_permission" "slack_mcp_function_url" {
 #------------------------------------------------------------------------------
 
 resource "aws_cloudwatch_log_group" "slack_mcp" {
+  count             = var.enable_slack_mcp ? 1 : 0
   name              = "/aws/lambda/${var.project_name}-slack-mcp"
   retention_in_days = 3
 }

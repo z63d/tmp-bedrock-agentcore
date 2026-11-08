@@ -32,6 +32,51 @@ variable "mysql_secret_arn" {
 }
 
 #------------------------------------------------------------------------------
+# Feature Toggles
+#------------------------------------------------------------------------------
+
+variable "enable_rollbar_mcp" {
+  type    = bool
+  default = false
+}
+
+variable "enable_newrelic_mcp" {
+  type    = bool
+  default = false
+}
+
+variable "enable_aws_mcp" {
+  type    = bool
+  default = false
+}
+
+variable "enable_github_mcp" {
+  type    = bool
+  default = true
+}
+
+variable "enable_slack_mcp" {
+  type    = bool
+  default = false
+}
+
+variable "enable_slack_ext_mcp" {
+  type    = bool
+  default = false
+}
+
+variable "enable_google_workspace_mcp" {
+  type    = bool
+  default = false
+}
+
+variable "enable_vpc_peering" {
+  description = "Create VPC Peering to product-workload VPC"
+  type        = bool
+  default     = false
+}
+
+#------------------------------------------------------------------------------
 # Rollbar MCP Server Variables
 #------------------------------------------------------------------------------
 
@@ -51,6 +96,12 @@ variable "rollbar_access_token" {
   description = "Rollbar API access token (sensitive)"
   type        = string
   sensitive   = true
+  default     = null
+
+  validation {
+    condition     = !var.enable_rollbar_mcp || var.rollbar_access_token != null
+    error_message = "rollbar_access_token is required when enable_rollbar_mcp = true."
+  }
 }
 
 #------------------------------------------------------------------------------
@@ -61,6 +112,12 @@ variable "newrelic_api_key" {
   description = "New Relic API key (NRAK-xxxxx). Used for Gateway outbound auth to the official New Relic MCP server."
   type        = string
   sensitive   = true
+  default     = null
+
+  validation {
+    condition     = !var.enable_newrelic_mcp || var.newrelic_api_key != null
+    error_message = "newrelic_api_key is required when enable_newrelic_mcp = true."
+  }
 }
 
 #------------------------------------------------------------------------------
@@ -71,6 +128,12 @@ variable "github_pat" {
   description = "GitHub PAT (e.g. 'ghp_xxxxx'). 'Bearer ' prefix is added automatically. Used for Gateway outbound auth to the official GitHub MCP server."
   type        = string
   sensitive   = true
+  default     = null
+
+  validation {
+    condition     = !var.enable_github_mcp || var.github_pat != null
+    error_message = "github_pat is required when enable_github_mcp = true."
+  }
 }
 
 #------------------------------------------------------------------------------
@@ -108,6 +171,12 @@ variable "allowed_slack_user_ids" {
 variable "google_cloud_service_account_key_path" {
   description = "Path to Google Cloud Service Account key JSON file for Google Workspace MCP. TODO: Migrate to Workload Identity Federation."
   type        = string
+  default     = null
+
+  validation {
+    condition     = !var.enable_google_workspace_mcp || var.google_cloud_service_account_key_path != null
+    error_message = "google_cloud_service_account_key_path is required when enable_google_workspace_mcp = true."
+  }
 }
 
 variable "google_workspace_mcp_lambda_memory" {

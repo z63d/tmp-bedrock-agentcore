@@ -10,6 +10,7 @@
 #------------------------------------------------------------------------------
 
 data "archive_file" "slack_ext_mcp" {
+  count       = var.enable_slack_ext_mcp ? 1 : 0
   type        = "zip"
   source_dir  = "${path.module}/../apps/lambda-slack-ext-mcp"
   output_path = "${path.module}/../apps/lambda-slack-ext-mcp/slack-ext-mcp.zip"
@@ -28,7 +29,8 @@ data "archive_file" "slack_ext_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_iam_role" "slack_ext_mcp_lambda" {
-  name = "${var.project_name}-slack-ext-mcp-lambda"
+  count = var.enable_slack_ext_mcp ? 1 : 0
+  name  = "${var.project_name}-slack-ext-mcp-lambda"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -45,8 +47,9 @@ resource "aws_iam_role" "slack_ext_mcp_lambda" {
 }
 
 resource "aws_iam_role_policy" "slack_ext_mcp_lambda" {
-  name = "${var.project_name}-slack-ext-mcp-policy"
-  role = aws_iam_role.slack_ext_mcp_lambda.id
+  count = var.enable_slack_ext_mcp ? 1 : 0
+  name  = "${var.project_name}-slack-ext-mcp-policy"
+  role  = aws_iam_role.slack_ext_mcp_lambda[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -70,12 +73,13 @@ resource "aws_iam_role_policy" "slack_ext_mcp_lambda" {
 #------------------------------------------------------------------------------
 
 resource "aws_lambda_function" "slack_ext_mcp" {
+  count         = var.enable_slack_ext_mcp ? 1 : 0
   function_name = "${var.project_name}-slack-ext-mcp"
-  role          = aws_iam_role.slack_ext_mcp_lambda.arn
+  role          = aws_iam_role.slack_ext_mcp_lambda[0].arn
 
   package_type     = "Zip"
-  filename         = data.archive_file.slack_ext_mcp.output_path
-  source_code_hash = data.archive_file.slack_ext_mcp.output_base64sha256
+  filename         = data.archive_file.slack_ext_mcp[0].output_path
+  source_code_hash = data.archive_file.slack_ext_mcp[0].output_base64sha256
   handler          = "dist/handler.handler"
   runtime          = "nodejs24.x"
   architectures    = ["arm64"]
@@ -97,6 +101,7 @@ resource "aws_lambda_function" "slack_ext_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_cloudwatch_log_group" "slack_ext_mcp" {
-  name              = "/aws/lambda/${aws_lambda_function.slack_ext_mcp.function_name}"
+  count             = var.enable_slack_ext_mcp ? 1 : 0
+  name              = "/aws/lambda/${aws_lambda_function.slack_ext_mcp[0].function_name}"
   retention_in_days = 3
 }

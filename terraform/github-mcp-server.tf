@@ -8,6 +8,7 @@
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_api_key_credential_provider" "github" {
+  count              = var.enable_github_mcp ? 1 : 0
   name               = "github-pat"
   api_key_wo         = "Bearer ${var.github_pat}"
   api_key_wo_version = 1

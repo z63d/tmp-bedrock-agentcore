@@ -8,6 +8,7 @@
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_api_key_credential_provider" "newrelic" {
+  count              = var.enable_newrelic_mcp ? 1 : 0
   name               = "newrelic-api-key"
   api_key_wo         = var.newrelic_api_key
   api_key_wo_version = 1

@@ -64,7 +64,7 @@ output "gateway_arn" {
 
 output "rollbar_mcp_lambda_arn" {
   description = "ARN of the Rollbar MCP Lambda function"
-  value       = aws_lambda_function.rollbar_mcp.arn
+  value       = one(aws_lambda_function.rollbar_mcp[*].arn)
 }
 
 #------------------------------------------------------------------------------
@@ -87,7 +87,7 @@ output "slack_bot_lambda_arn" {
 
 output "slack_mcp_function_url" {
   description = "Function URL of the Slack MCP Lambda"
-  value       = aws_lambda_function_url.slack_mcp.function_url
+  value       = one(aws_lambda_function_url.slack_mcp[*].function_url)
 }
 
 #------------------------------------------------------------------------------
@@ -96,10 +96,10 @@ output "slack_mcp_function_url" {
 
 output "google_workspace_mcp_ecr_url" {
   description = "URL of the Google Workspace MCP ECR repository"
-  value       = aws_ecr_repository.google_workspace_mcp.repository_url
+  value       = one(aws_ecr_repository.google_workspace_mcp[*].repository_url)
 }
 
 output "google_workspace_mcp_function_url" {
   description = "Function URL of the Google Workspace MCP Lambda"
-  value       = aws_lambda_function_url.google_workspace_mcp.function_url
+  value       = one(aws_lambda_function_url.google_workspace_mcp[*].function_url)
 }

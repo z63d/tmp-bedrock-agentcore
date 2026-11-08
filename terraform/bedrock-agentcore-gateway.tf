@@ -34,7 +34,8 @@ resource "aws_iam_role_policy" "gateway" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    # Drop statements whose Resource is empty (all related MCP servers disabled)
+    Statement = [for s in [
       # API Gateway is not used - AgentCore Gateway calls Lambda directly
       # {
       #   Sid    = "InvokeAPIGateway"
@@ -50,10 +51,10 @@ resource "aws_iam_role_policy" "gateway" {
         Action = [
           "lambda:InvokeFunction"
         ]
-        Resource = [
-          aws_lambda_function.rollbar_mcp.arn,
-          aws_lambda_function.slack_ext_mcp.arn,
-        ]
+        Resource = concat(
+          aws_lambda_function.rollbar_mcp[*].arn,
+          aws_lambda_function.slack_ext_mcp[*].arn,
+        )
       },
       {
         Sid    = "InvokeFunctionUrl"
@@ -61,10 +62,10 @@ resource "aws_iam_role_policy" "gateway" {
         Action = [
           "lambda:InvokeFunctionUrl"
         ]
-        Resource = [
-          aws_lambda_function.google_workspace_mcp.arn,
-          aws_lambda_function.slack_mcp.arn,
-        ]
+        Resource = concat(
+          aws_lambda_function.google_workspace_mcp[*].arn,
+          aws_lambda_function.slack_mcp[*].arn,
+        )
       },
       {
         Sid    = "GetWorkloadAccessToken"
@@ -83,13 +84,15 @@ resource "aws_iam_role_policy" "gateway" {
         Action = [
           "bedrock-agentcore:GetResourceApiKey"
         ]
-        Resource = [
-          "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:workload-identity-directory/default",
-          "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:workload-identity-directory/default/workload-identity/${var.project_name}-*",
-          "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:token-vault/default",
-          aws_bedrockagentcore_api_key_credential_provider.newrelic.credential_provider_arn,
-          aws_bedrockagentcore_api_key_credential_provider.github.credential_provider_arn
-        ]
+        Resource = concat(
+          [
+            "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:workload-identity-directory/default",
+            "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:workload-identity-directory/default/workload-identity/${var.project_name}-*",
+            "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:token-vault/default",
+          ],
+          aws_bedrockagentcore_api_key_credential_provider.newrelic[*].credential_provider_arn,
+          aws_bedrockagentcore_api_key_credential_provider.github[*].credential_provider_arn,
+        )
       },
       {
         Sid    = "GetSecretValue"
@@ -97,10 +100,10 @@ resource "aws_iam_role_policy" "gateway" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = [
-          aws_bedrockagentcore_api_key_credential_provider.newrelic.api_key_secret_arn[0].secret_arn,
-          aws_bedrockagentcore_api_key_credential_provider.github.api_key_secret_arn[0].secret_arn
-        ]
+        Resource = concat(
+          aws_bedrockagentcore_api_key_credential_provider.newrelic[*].api_key_secret_arn[0].secret_arn,
+          aws_bedrockagentcore_api_key_credential_provider.github[*].api_key_secret_arn[0].secret_arn,
+        )
       },
       # Wildcard to avoid circular dependency: this IAM policy must be
       # created before the Gateway, so we cannot reference gateway_arn here.
@@ -126,7 +129,7 @@ resource "aws_iam_role_policy" "gateway" {
           "arn:aws:bedrock-agentcore:${var.aws_region}:${local.account_id}:gateway/*"
         ]
       }
-    ]
+    ] : s if length(s.Resource) > 0]
   })
 }
 
@@ -200,6 +203,7 @@ resource "aws_cloudwatch_log_delivery" "gateway" {
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_gateway_target" "rollbar_mcp" {
+  count              = var.enable_rollbar_mcp ? 1 : 0
   name               = "rollbar-mcp-server"
   gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
   description        = "Rollbar MCP Server Lambda target for error tracking and monitoring"
@@ -213,7 +217,7 @@ resource "aws_bedrockagentcore_gateway_target" "rollbar_mcp" {
   target_configuration {
     mcp {
       lambda {
-        lambda_arn = aws_lambda_function.rollbar_mcp.arn
+        lambda_arn = aws_lambda_function.rollbar_mcp[0].arn
 
         tool_schema {
           # get-item-details
@@ -427,13 +431,14 @@ resource "aws_bedrockagentcore_gateway_target" "rollbar_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_gateway_target" "newrelic_mcp" {
+  count              = var.enable_newrelic_mcp ? 1 : 0
   name               = "newrelic-mcp-server"
   gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
   description        = "New Relic official MCP server"
 
   credential_provider_configuration {
     api_key {
-      provider_arn              = aws_bedrockagentcore_api_key_credential_provider.newrelic.credential_provider_arn
+      provider_arn              = aws_bedrockagentcore_api_key_credential_provider.newrelic[0].credential_provider_arn
       credential_location       = "HEADER"
       credential_parameter_name = "api-key"
     }
@@ -455,6 +460,7 @@ resource "aws_bedrockagentcore_gateway_target" "newrelic_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_gateway_target" "aws_mcp" {
+  count              = var.enable_aws_mcp ? 1 : 0
   name               = "aws-mcp-server"
   gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
   description        = "AWS official MCP server for calling AWS APIs"
@@ -483,13 +489,14 @@ resource "aws_bedrockagentcore_gateway_target" "aws_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_gateway_target" "github_mcp" {
+  count              = var.enable_github_mcp ? 1 : 0
   name               = "github-mcp-server"
   gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
   description        = "GitHub official remote MCP server for repos, issues, PRs, code search"
 
   credential_provider_configuration {
     api_key {
-      provider_arn              = aws_bedrockagentcore_api_key_credential_provider.github.credential_provider_arn
+      provider_arn              = aws_bedrockagentcore_api_key_credential_provider.github[0].credential_provider_arn
       credential_location       = "HEADER"
       credential_parameter_name = "Authorization"
     }
@@ -512,6 +519,7 @@ resource "aws_bedrockagentcore_gateway_target" "github_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_gateway_target" "slack_ext_mcp" {
+  count              = var.enable_slack_ext_mcp ? 1 : 0
   name               = "slack-ext-mcp-server"
   gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
   description        = "Slack Extended MCP Server - Canvas create/edit/delete/access operations"
@@ -523,7 +531,7 @@ resource "aws_bedrockagentcore_gateway_target" "slack_ext_mcp" {
   target_configuration {
     mcp {
       lambda {
-        lambda_arn = aws_lambda_function.slack_ext_mcp.arn
+        lambda_arn = aws_lambda_function.slack_ext_mcp[0].arn
 
         tool_schema {
           inline_payload {
@@ -721,6 +729,7 @@ resource "aws_bedrockagentcore_gateway_target" "slack_ext_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_gateway_target" "slack_mcp" {
+  count              = var.enable_slack_mcp ? 1 : 0
   name               = "slack-mcp-server"
   gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
   description        = "Slack MCP server (channels, messages, reactions, users, search) via Lambda"
@@ -735,7 +744,7 @@ resource "aws_bedrockagentcore_gateway_target" "slack_mcp" {
   target_configuration {
     mcp {
       mcp_server {
-        endpoint     = "${aws_lambda_function_url.slack_mcp.function_url}mcp"
+        endpoint     = "${aws_lambda_function_url.slack_mcp[0].function_url}mcp"
         listing_mode = "DEFAULT"
       }
     }
@@ -749,6 +758,7 @@ resource "aws_bedrockagentcore_gateway_target" "slack_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_bedrockagentcore_gateway_target" "google_workspace_mcp" {
+  count              = var.enable_google_workspace_mcp ? 1 : 0
   name               = "google-workspace-mcp-server"
   gateway_identifier = aws_bedrockagentcore_gateway.main.gateway_id
   description        = "Google Workspace MCP server (Drive, Docs, Sheets, Slides) via Lambda"
@@ -763,7 +773,7 @@ resource "aws_bedrockagentcore_gateway_target" "google_workspace_mcp" {
   target_configuration {
     mcp {
       mcp_server {
-        endpoint     = "${aws_lambda_function_url.google_workspace_mcp.function_url}mcp"
+        endpoint     = "${aws_lambda_function_url.google_workspace_mcp[0].function_url}mcp"
         listing_mode = "DEFAULT"
       }
     }

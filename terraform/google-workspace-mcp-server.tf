@@ -13,6 +13,7 @@
 #------------------------------------------------------------------------------
 
 resource "aws_ecr_repository" "google_workspace_mcp" {
+  count                = var.enable_google_workspace_mcp ? 1 : 0
   name                 = "${var.project_name}-google-workspace-mcp"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
@@ -23,7 +24,8 @@ resource "aws_ecr_repository" "google_workspace_mcp" {
 }
 
 resource "aws_ecr_lifecycle_policy" "google_workspace_mcp" {
-  repository = aws_ecr_repository.google_workspace_mcp.name
+  count      = var.enable_google_workspace_mcp ? 1 : 0
+  repository = aws_ecr_repository.google_workspace_mcp[0].name
 
   policy = jsonencode({
     rules = [{
@@ -46,16 +48,18 @@ resource "aws_ecr_lifecycle_policy" "google_workspace_mcp" {
 #------------------------------------------------------------------------------
 
 locals {
-  google_cloud_sa_key_json = file(var.google_cloud_service_account_key_path)
+  google_cloud_sa_key_json = var.enable_google_workspace_mcp ? file(var.google_cloud_service_account_key_path) : null
 }
 
 resource "aws_secretsmanager_secret" "google_cloud_sa_key" {
+  count                   = var.enable_google_workspace_mcp ? 1 : 0
   name                    = "${var.project_name}/google-cloud-sa-key"
   recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "google_cloud_sa_key" {
-  secret_id     = aws_secretsmanager_secret.google_cloud_sa_key.id
+  count         = var.enable_google_workspace_mcp ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.google_cloud_sa_key[0].id
   secret_string = local.google_cloud_sa_key_json
 }
 
@@ -64,7 +68,8 @@ resource "aws_secretsmanager_secret_version" "google_cloud_sa_key" {
 #------------------------------------------------------------------------------
 
 resource "aws_iam_role" "google_workspace_mcp_lambda" {
-  name = "${var.project_name}-google-workspace-mcp-lambda"
+  count = var.enable_google_workspace_mcp ? 1 : 0
+  name  = "${var.project_name}-google-workspace-mcp-lambda"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -81,8 +86,9 @@ resource "aws_iam_role" "google_workspace_mcp_lambda" {
 }
 
 resource "aws_iam_role_policy" "google_workspace_mcp_lambda" {
-  name = "${var.project_name}-google-workspace-mcp-policy"
-  role = aws_iam_role.google_workspace_mcp_lambda.id
+  count = var.enable_google_workspace_mcp ? 1 : 0
+  name  = "${var.project_name}-google-workspace-mcp-policy"
+  role  = aws_iam_role.google_workspace_mcp_lambda[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -103,7 +109,7 @@ resource "aws_iam_role_policy" "google_workspace_mcp_lambda" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = aws_secretsmanager_secret.google_cloud_sa_key.arn
+        Resource = aws_secretsmanager_secret.google_cloud_sa_key[0].arn
       }
     ]
   })
@@ -114,17 +120,18 @@ resource "aws_iam_role_policy" "google_workspace_mcp_lambda" {
 #------------------------------------------------------------------------------
 
 resource "aws_lambda_function" "google_workspace_mcp" {
+  count         = var.enable_google_workspace_mcp ? 1 : 0
   function_name = "${var.project_name}-google-workspace-mcp"
-  role          = aws_iam_role.google_workspace_mcp_lambda.arn
+  role          = aws_iam_role.google_workspace_mcp_lambda[0].arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.google_workspace_mcp.repository_url}:latest"
+  image_uri     = "${aws_ecr_repository.google_workspace_mcp[0].repository_url}:latest"
   architectures = ["arm64"]
   memory_size   = var.google_workspace_mcp_lambda_memory
   timeout       = var.google_workspace_mcp_lambda_timeout
 
   environment {
     variables = {
-      GOOGLE_CLOUD_SA_KEY_JSON = aws_secretsmanager_secret_version.google_cloud_sa_key.secret_string
+      GOOGLE_CLOUD_SA_KEY_JSON = aws_secretsmanager_secret_version.google_cloud_sa_key[0].secret_string
     }
   }
 
@@ -136,15 +143,17 @@ resource "aws_lambda_function" "google_workspace_mcp" {
 #------------------------------------------------------------------------------
 
 resource "aws_lambda_function_url" "google_workspace_mcp" {
-  function_name      = aws_lambda_function.google_workspace_mcp.function_name
+  count              = var.enable_google_workspace_mcp ? 1 : 0
+  function_name      = aws_lambda_function.google_workspace_mcp[0].function_name
   authorization_type = "AWS_IAM"
   invoke_mode        = "RESPONSE_STREAM"
 }
 
 resource "aws_lambda_permission" "google_workspace_mcp_function_url" {
+  count                  = var.enable_google_workspace_mcp ? 1 : 0
   statement_id           = "AllowGatewayFunctionUrl"
   action                 = "lambda:InvokeFunctionUrl"
-  function_name          = aws_lambda_function.google_workspace_mcp.function_name
+  function_name          = aws_lambda_function.google_workspace_mcp[0].function_name
   principal              = aws_iam_role.gateway.arn
   function_url_auth_type = "AWS_IAM"
 }
@@ -154,6 +163,7 @@ resource "aws_lambda_permission" "google_workspace_mcp_function_url" {
 #------------------------------------------------------------------------------
 
 resource "aws_cloudwatch_log_group" "google_workspace_mcp" {
+  count             = var.enable_google_workspace_mcp ? 1 : 0
   name              = "/aws/lambda/${var.project_name}-google-workspace-mcp"
   retention_in_days = 3
 }

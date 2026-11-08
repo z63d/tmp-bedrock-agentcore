@@ -138,7 +138,11 @@ case "$1" in
     ;;
   all)
     deploy_agent
-    deploy_google_workspace
+    if (cd "$TERRAFORM_DIR" && terraform output -raw google_workspace_mcp_ecr_url >/dev/null 2>&1); then
+      deploy_google_workspace
+    else
+      echo "Skip Google Workspace MCP (enable_google_workspace_mcp = false)"
+    fi
     deploy_slack_mcp
     deploy_slack_bot
     ;;

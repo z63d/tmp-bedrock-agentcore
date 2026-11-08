@@ -23,7 +23,7 @@ resource "aws_bedrockagentcore_policy_engine" "main" {
 
 locals {
   gateway_resource    = "AgentCore::Gateway::\"${aws_bedrockagentcore_gateway.main.gateway_arn}\""
-  slack_target_name   = aws_bedrockagentcore_gateway_target.slack_mcp.name
+  slack_target_name   = one(aws_bedrockagentcore_gateway_target.slack_mcp[*].name)
   allowed_channel_set = join(", ", formatlist("\"%s\"", var.allowed_slack_channel_ids))
 }
 
@@ -57,7 +57,7 @@ resource "aws_bedrockagentcore_policy" "default_permit" {
 
 # Restrict conversations_history to allowed channels
 resource "aws_bedrockagentcore_policy" "forbid_conversations_history" {
-  count            = length(var.allowed_slack_channel_ids) > 0 ? 1 : 0
+  count            = var.enable_slack_mcp && length(var.allowed_slack_channel_ids) > 0 ? 1 : 0
   name             = "forbid_conversations_history"
   policy_engine_id = aws_bedrockagentcore_policy_engine.main.policy_engine_id
   description      = "Restrict channel history to allowed channels only"
@@ -79,7 +79,7 @@ resource "aws_bedrockagentcore_policy" "forbid_conversations_history" {
 
 # Restrict conversations_replies to allowed channels
 resource "aws_bedrockagentcore_policy" "forbid_conversations_replies" {
-  count            = length(var.allowed_slack_channel_ids) > 0 ? 1 : 0
+  count            = var.enable_slack_mcp && length(var.allowed_slack_channel_ids) > 0 ? 1 : 0
   name             = "forbid_conversations_replies"
   policy_engine_id = aws_bedrockagentcore_policy_engine.main.policy_engine_id
   description      = "Restrict thread replies to allowed channels only"
